@@ -184,6 +184,8 @@ select,input[type=text],input[type=number],input[type=url],input[type=date],inpu
 .ein{width:100%;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;padding:6px 9px;font:inherit;font-size:14px;margin-bottom:6px;resize:vertical}
 .ein[data-f="n"]{font-weight:600}
 textarea{font:inherit}
+.imp{display:flex;flex-direction:column;gap:10px}
+.imp .steps{font-size:12px;color:var(--muted)}
 .alts{display:flex;flex-direction:column;gap:10px}
 .plist.flat{border:0;border-radius:0;background:transparent;margin-inline:-14px;margin-bottom:-14px;border-top:1px solid var(--line)}
 .pin-alt{width:34px;height:20px;border-radius:10px;display:grid;place-items:center;background:var(--surface);color:var(--accent);font:600 10px/1 var(--f-body);border:2px dashed var(--accent);box-shadow:0 1px 4px rgba(0,0,0,.3)}
@@ -311,6 +313,34 @@ function readSettings_() {
   return o;
 }
 
+// อ่านชื่อร้าน + พิกัดจากลิงก์แชร์ของ Google Maps (เปิดเฉพาะลิงก์ของ Google) และหาพิกัดจากที่อยู่ด้วย Maps service ของ Apps Script
+function resolve_(u, t) {
+  let url = String(u || ''), name = '', lat = null, lng = null;
+  try {
+    for (let i = 0; i < 5; i++) {
+      if (!/^https:\/\/(maps\.app\.goo\.gl|goo\.gl|g\.co)\//.test(url)) break;
+      const r = UrlFetchApp.fetch(url, { followRedirects: false, muteHttpExceptions: true });
+      const h = r.getAllHeaders(); const loc = h['Location'] || h['location'];
+      if (!loc) break;
+      url = Array.isArray(loc) ? loc[0] : loc;
+    }
+  } catch (err) {}
+  const m = url.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/) || url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || url.match(/[?&](?:q|query|ll)=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (m) { lat = +m[1]; lng = +m[2]; }
+  const pm = url.match(/\/place\/([^\/@?]+)/);
+  if (pm) { try { name = decodeURIComponent(pm[1].replace(/\+/g, ' ')); } catch (err) { name = pm[1]; } }
+  if (lat === null) {
+    const q = String(t || name).trim();
+    if (q) {
+      try {
+        const g = Maps.newGeocoder().setRegion('jp').geocode(q);
+        if (g.status === 'OK' && g.results.length) { lat = g.results[0].geometry.location.lat; lng = g.results[0].geometry.location.lng; }
+      } catch (err) {}
+    }
+  }
+  return { ok: true, url: url, name: name, lat: lat, lng: lng };
+}
+
 function out_(o) {
   return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
 }
@@ -380,6 +410,7 @@ function doPost(e) {
 function doGet(e) {
   if (SECRET && (!e.parameter || e.parameter.key !== SECRET)) return out_({ ok: false, error: 'รหัสลับไม่ถูกต้อง' });
   if (e.parameter && e.parameter.type === 'settings') return out_({ ok: true, settings: readSettings_() });
+  if (e.parameter && e.parameter.type === 'resolve') return out_(resolve_(e.parameter.u || '', e.parameter.t || ''));
   const sh = sheet_(EXP, EXP_HEAD);
   const n = sh.getLastRow() - 1;
   const vals = n > 0 ? sh.getRange(2, 1, n, EXP_HEAD.length).getValues() : [];
@@ -687,7 +718,7 @@ let pendingDel = load('jt.del', []);
 let locQ = load('jt.locq', []);
 const S = { day: autoDay() || load('jt.day',1), tab: load('jt.tab','map'), anchor:'gps', radius:500, ncat:'f',
             mapCats:new Set(CAT_KEYS), pos:null, watchId:null, lastLog:0, syncing:false, syncErr:'', fitted:false, delAsk:null,
-            form:{cat:'food', pay:'cash', cur:'JPY'}, nsrc:'live', gFail:false, gErr:'' };
+            form:{cat:'food', pay:'cash', cur:'JPY'}, nsrc:'live', imp:null, gFail:false, gErr:'' };
 
 function dist(a,b){ const R=6371000, r=x=>x*Math.PI/180; const dLa=r(b[0]-a[0]), dLo=r(b[1]-a[1]);
   const h=Math.sin(dLa/2)**2 + Math.cos(r(a[0]))*Math.cos(r(b[0]))*Math.sin(dLo/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
@@ -698,6 +729,7 @@ const baht = n => '฿' + Math.round(n).toLocaleString('en-US');
 const gq = p => p.ja || p.name;
 const gSearch = q => 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q);
 const gDir = (dest, mode='walking', pid) => 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(dest) + (pid ? '&destination_place_id=' + encodeURIComponent(pid) : '') + '&travelmode=' + mode;
+const navHref = (s, mode='walking') => s.url ? esc(s.url) : gDir(s.q||s.ll.join(','), mode, s.gid);
 const gNear = (g, ll) => 'https://www.google.com/maps/search/' + encodeURIComponent(g) + '/@' + ll[0] + ',' + ll[1] + ',17z';
 
 function tripDate(n){ if(!settings.start) return null; const d=new Date(settings.start+'T00:00:00'); d.setDate(d.getDate()+n-1); return d; }
@@ -718,7 +750,7 @@ const ALT_SEED = { // แผนรองตั้งต้นที่แนะ�
   4:['東京国立博物館','ヤマシロヤ 上野','成田山公園','イオンモール成田'],
   5:['成田空港 第1ターミナル 展望デッキ','成田空港 第2ターミナル 展望デッキ']
 };
-function poiStop(p,t,id){ return {id:id||('c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)), t:t||'', z:zoneOf(p), n:p.name, ll:p.ll, q:p.ja, note:p.note, poi:p.id, cat:p.cat, gid:p.gid||''}; }
+function poiStop(p,t,id){ return {id:id||('c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)), t:t||'', z:zoneOf(p), n:p.name, ll:p.ll, q:p.ja, note:p.note, poi:p.id, cat:p.cat, gid:p.gid||'', url:p.gmaps?(p.url||''):''}; }
 const isMain = s => /^d\d+s\d+$/.test(s.id);   // แผนหลัก (ล็อก แก้ไม่ได้)
 function defaultAlts(n){ return (ALT_SEED[n]||[]).map(j=>P.find(p=>p.ja===j)).filter(Boolean).map(p=>poiStop(p,'','a'+n+p.id)); }
 let custom = (function(c){ Object.keys(c).forEach(n=>{ const v=c[n]; if(v && v.stops && !v.added) c[n]={added:v.stops.filter(s=>!/^d\d+s\d+$/.test(s.id)), alts:v.alts||[]}; }); return c; })(load('jt.plan', {}));
@@ -872,10 +904,10 @@ function planBtns(pid){ const st=inPlan(pid);
     (st==='alt' ? `<span class="tag">อยู่ในแผนรอง</span>` : `<button class="btn sm add" type="button" onclick="addToPlan('${pid}','alt')">+ แผนรอง</button>`); }
 function stopPopup(s,i){ const q = s.q || (s.ll[0]+','+s.ll[1]);
   return `<div class="pop"><span class="label">${s.t} · จุดที่ ${i+1}</span><h4>${esc(s.n)}</h4>${s.note?`<p>${esc(s.note)}</p>`:''}
-  <div class="links"><a class="btn sm pri" target="_blank" rel="noopener" href="${gDir(q, s.mv?'transit':'walking', s.gid)}">นำทาง</a>${s.mv?'':`<button class="btn sm" type="button" onclick="nearStop('${s.id}')">ดูรอบๆ</button>${isMain(s)?'':`<button class="btn sm" type="button" onclick="demote('${s.id}')">ย้ายไปแผนรอง</button>`}`}</div></div>`; }
+  <div class="links"><a class="btn sm pri" target="_blank" rel="noopener" href="${navHref(s, s.mv?'transit':'walking')}">นำทาง</a>${s.mv?'':`<button class="btn sm" type="button" onclick="nearStop('${s.id}')">ดูรอบๆ</button>${isMain(s)?'':`<button class="btn sm" type="button" onclick="demote('${s.id}')">ย้ายไปแผนรอง</button>`}`}</div></div>`; }
 function altPopup(s){ const q = s.q || (s.ll[0]+','+s.ll[1]);
   return `<div class="pop"><span class="label">แผนรอง</span><h4>${esc(s.n)}</h4>${s.note?`<p>${esc(s.note)}</p>`:''}
-  <div class="links"><button class="btn sm pri" type="button" onclick="promote('${s.id}')">ใส่ในแผน</button><a class="btn sm" target="_blank" rel="noopener" href="${gDir(q,'walking',s.gid)}">นำทาง</a></div></div>`; }
+  <div class="links"><button class="btn sm pri" type="button" onclick="promote('${s.id}')">ใส่ในแผน</button><a class="btn sm" target="_blank" rel="noopener" href="${navHref(s)}">นำทาง</a></div></div>`; }
 
 function renderMapChips(d){
   $('#mapCats').innerHTML = CAT_KEYS.map(k=>`<button class="chip" type="button" data-mc="${k}" aria-pressed="${S.mapCats.has(k)}"><i class="bg-${k}">${CAT[k].glyph}</i>${CAT[k].label}</button>`).join('');
@@ -1016,7 +1048,7 @@ function renderPlan(){
   let next='';
   if(me){ const ni = act>=0 ? Math.min(act+ (d.stops[act] && dist(me,d.stops[act].ll)<150 ? 1:0), d.stops.length-1) : 0; const s=d.stops[ni]; const m=dist(me,s.ll);
     next = `<div class="next"><div style="flex:1;min-width:0"><div class="label">จุดถัดไป · ${s.t}</div><div style="font-weight:600">${esc(s.n)}</div><div class="sub">${m>3000?'ใช้รถไฟ':'เดิน ~'+walk(m)+' นาที'}</div></div><div class="big">${fmtD(m)}</div>
-      <a class="btn pri sm" target="_blank" rel="noopener" href="${gDir(s.q||s.ll.join(','), m>2000?'transit':'walking', s.gid)}">นำทาง</a></div>`; }
+      <a class="btn pri sm" target="_blank" rel="noopener" href="${navHref(s, m>2000?'transit':'walking')}">นำทาง</a></div>`; }
   $('#planPad').innerHTML = `
     <div class="dayhead"><span class="label">วันที่ ${d.n}${dt?' · '+dt.toLocaleDateString('th-TH',{weekday:'long',day:'numeric',month:'long'}):''}</span><h2>${esc(d.title)}</h2>
       <div class="facts">${d.facts.map(f=>`<div class="fact">${esc(f[0])}<b>${esc(f[1])}</b></div>`).join('')}</div></div>
@@ -1032,7 +1064,7 @@ function renderPlan(){
         : `<h4>${esc(s.n)}${main ? (S.editMode?' <span class="tag">แผนหลัก · ล็อก</span>':'') : ' <span class="tag">เพิ่มเอง</span>'}</h4>${s.note?`<p>${esc(s.note)}</p>`:''}`;
       const tools = editable
         ? `<div class="links"><button class="btn sm" type="button" onclick="demote('${s.id}')">ย้ายไปแผนรอง</button><button class="btn sm danger" type="button" onclick="removeItem('${s.id}')">ลบ</button></div>`
-        : S.editMode ? '' : `<div class="links"><a class="btn sm" target="_blank" rel="noopener" href="${gDir(s.q||s.ll.join(','), s.mv?'transit':'walking', s.gid)}">นำทาง</a>${s.mv?'':`<button class="btn sm ghost" type="button" onclick="nearStop('${s.id}')">ดูรอบๆ 500 ม.</button>`}</div>`;
+        : S.editMode ? '' : `<div class="links"><a class="btn sm" target="_blank" rel="noopener" href="${navHref(s, s.mv?'transit':'walking')}">นำทาง</a>${s.mv?'':`<button class="btn sm ghost" type="button" onclick="nearStop('${s.id}')">ดูรอบๆ 500 ม.</button>`}</div>`;
       return `<li class="${cls}"><div class="t">${time}</div><div class="rail"><span></span></div><div class="body">
         ${head}${dm!==null && !editable?`<div class="meta num">ห่าง ${fmtD(dm)}</div>`:''}
         ${tools}</div></li>`; }).join('')}</ol>
@@ -1051,7 +1083,7 @@ function renderPlan(){
         return `<li class="pitem"><div class="ic bg-${s.cat||'h'}">${CAT[s.cat||'h'].glyph}</div><div style="min-width:0">${S.editMode
           ? `<input class="ein" type="text" value="${esc(s.n)}" data-edit="${s.id}" data-f="n" aria-label="ชื่อรายการ"><input class="ein" type="text" value="${esc(s.note||'')}" data-edit="${s.id}" data-f="note" placeholder="โน้ต (ไม่บังคับ)" aria-label="โน้ต">`
           : `<h4>${esc(s.n)}</h4>${s.note?`<p>${esc(s.note)}</p>`:''}`}
-          <div class="links"><button class="btn sm pri" type="button" onclick="promote('${s.id}')">ใส่ในแผน</button><a class="btn sm" target="_blank" rel="noopener" href="${gDir(s.q||s.ll.join(','),'walking',s.gid)}">นำทาง</a><button class="btn sm ghost danger" type="button" onclick="removeItem('${s.id}')">ลบ</button></div></div>
+          <div class="links"><button class="btn sm pri" type="button" onclick="promote('${s.id}')">ใส่ในแผน</button><a class="btn sm" target="_blank" rel="noopener" href="${navHref(s)}">นำทาง</a><button class="btn sm ghost danger" type="button" onclick="removeItem('${s.id}')">ลบ</button></div></div>
           <div class="d">${dm!==null?`<b>${fmtD(dm)}</b>`:''}</div></li>`; }).join('')}</ul>`
         : `<p class="sub">ยังไม่มีแผนรอง กด "+ แผนรอง" ในแท็บรอบตัวหรือบนหมุดแผนที่</p>`}
     </div>
@@ -1095,7 +1127,8 @@ function renderNear(){
       body = `${srcSeg}
       <div class="cats" id="ncats">${CAT_KEYS.map(k=>`<button class="chip" type="button" data-nc="${k}" aria-pressed="${S.ncat===k}"><i class="bg-${k}">${CAT[k].glyph}</i>${CAT[k].label}</button>`).join('')}</div>
       <div id="liveBox"><div class="card empty">กำลังค้นหา${CAT[S.ncat].label}ในระยะ ${S.radius} ม. จาก Google…</div></div>
-      <a class="btn" target="_blank" rel="noopener" href="${gNear(CAT[S.ncat].g, a.ll)}">เปิดค้นหาใน Google Maps</a>`;
+      <a class="btn" target="_blank" rel="noopener" href="${gNear(CAT[S.ncat].g, a.ll)}">เปิดค้นหาใน Google Maps</a>
+      ${importBox()}`;
       const req = S.liveReq = Date.now();
       setTimeout(()=>liveSearch(a.ll, S.ncat, S.radius).then(list=>{
         if(S.liveReq!==req || !$('#liveBox')) return;
@@ -1112,6 +1145,7 @@ function renderNear(){
       <div class="cats" id="ncats">${CAT_KEYS.map(k=>`<button class="chip" type="button" data-nc="${k}" aria-pressed="${S.ncat===k}"><i class="bg-${k}">${CAT[k].glyph}</i>${CAT[k].label} <span class="count">${counts[k]}</span></button>`).join('')}</div>
       ${list.length ? `<ul class="plist">${list.map(item).join('')}</ul>` : `<div class="card empty">ยังไม่มี${CAT[S.ncat].label}ที่คัดไว้ในระยะ ${S.radius} ม. จาก "${esc(a.name)}"</div>`}
       <a class="btn" target="_blank" rel="noopener" href="${gNear(CAT[S.ncat].g, a.ll)}">ค้นหา${CAT[S.ncat].label}เพิ่มใน Google Maps รอบจุดนี้</a>
+      ${importBox()}
       ${more.length ? `<div class="label">ไกลขึ้นอีกนิด (ไม่เกิน 1.2 กม.)</div><ul class="plist">${more.slice(0,8).map(item).join('')}</ul>` : ''}`;
   }
   $('#nearPad').innerHTML = `
@@ -1123,6 +1157,73 @@ function renderNear(){
   $('#nearPad').querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{ S.radius=+b.dataset.r; renderNear(); });
   const nc=$('#ncats'); if(nc) nc.onclick=e=>{ const b=e.target.closest('[data-nc]'); if(b){ S.ncat=b.dataset.nc; renderNear(); } };
   $('#nearPad').querySelectorAll('[data-src]').forEach(b=>b.onclick=()=>{ S.nsrc=b.dataset.src; renderNear(); });
+  bindImport();
+}
+
+/* ============ เพิ่มร้านจากลิงก์ Google Maps (ไม่ต้องใช้ API Key) ============ */
+function importBox(){
+  return `<div class="card imp" id="impBox"><div class="planbar"><h3>เพิ่มร้านที่เจอใน Google Maps</h3></div>
+    <ol class="steps"><li>กดปุ่มด้านบนเพื่อค้นใน Google Maps</li><li>เลือกร้าน → กด <b>แชร์</b> → <b>คัดลอกลิงก์</b></li><li>กลับมาที่แอปนี้ แล้ววางในช่องด้านล่าง</li></ol>
+    <div class="amt" style="grid-template-columns:1fr auto"><textarea id="imp-t" rows="2" class="ein" style="margin:0" placeholder="วางลิงก์หรือข้อความที่คัดลอกจาก Google Maps" aria-label="ลิงก์ Google Maps">${esc(S.imp?S.imp.raw:'')}</textarea>
+      <button class="btn" type="button" id="imp-paste">วาง</button></div>
+    <div id="imp-res">${S.imp ? importResult() : ''}</div></div>`;
+}
+function parseGmaps(text){
+  const urlM = text.match(/https?:\/\/[^\s"'<>]+/); const url = urlM ? urlM[0] : '';
+  const lines = text.split(/\n/).map(l=>l.trim()).filter(l=>l && !/https?:\/\//.test(l) && !/★|☆/.test(l));
+  const dec = x=>{ try{ return decodeURIComponent(x.replace(/\+/g,' ')); }catch(e){ return x; } };
+  let name = lines[0]||'', addr = lines[1]||'', ll=null;
+  const m = url.match(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/) || url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/) || url.match(/[?&](?:q|query|ll|center|destination)=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if(m) ll=[+m[1],+m[2]];
+  const pm = url.match(/\/place\/([^/@?]+)/); if(!name && pm) name=dec(pm[1]);
+  const qm = url.match(/[?&](?:q|query)=([^&]+)/); if(!name && qm && !/^-?\d+\.\d+,/.test(dec(qm[1]))) name=dec(qm[1]);
+  return {url, name, addr, ll};
+}
+async function runImport(raw){
+  raw=(raw||'').trim(); if(!raw){ S.imp=null; $('#imp-res').innerHTML=''; return; }
+  if(S.imp && S.imp.raw===raw) return;   // ข้อความเดิม ไม่ต้องอ่านซ้ำ (กันปุ่มหายตอนกด)
+  if(!/google\.|goo\.gl|g\.co\//.test(raw)){ S.imp={raw, err:'ไม่ใช่ลิงก์ Google Maps ลองกด แชร์ → คัดลอกลิงก์ ในแอป Google Maps อีกครั้ง'}; $('#imp-res').innerHTML=importResult(); return; }
+  const r=parseGmaps(raw); S.imp={raw, name:r.name, addr:r.addr, url:r.url, ll:r.ll, cat:S.ncat, loading:false};
+  if((!r.ll || !r.name) && settings.url){
+    S.imp.loading=true; $('#imp-res').innerHTML=importResult();
+    try{ const res = await fetch(gsUrl('resolve')+'&u='+encodeURIComponent(r.url)+'&t='+encodeURIComponent([r.name,r.addr].filter(Boolean).join(' '))); const j=await res.json();
+      if(S.imp && S.imp.raw===raw){ if(j.ok){ if(!S.imp.name && j.name) S.imp.name=j.name; if(!S.imp.ll && j.lat!=null) S.imp.ll=[+j.lat,+j.lng]; if(j.url) S.imp.longUrl=j.url; } else S.imp.note2=j.error||''; }
+    }catch(e){ if(S.imp) S.imp.note2='ติดต่อ Google Sheet ไม่ได้'; }
+    if(S.imp) S.imp.loading=false;
+  }
+  if($('#imp-res')) $('#imp-res').innerHTML=importResult();
+}
+function importResult(){
+  const m=S.imp; if(!m) return '';
+  if(m.err) return `<p class="msg" style="color:var(--bad)">${esc(m.err)}</p>`;
+  if(m.loading) return `<p class="msg">กำลังอ่านชื่อร้านและพิกัดจากลิงก์…</p>`;
+  const a=anchorInfo(); const d = m.ll && a ? dist(a.ll, m.ll) : null;
+  const stops=curDay().stops.filter(s=>!s.mv);
+  return `<div class="field"><label for="imp-n">ชื่อร้าน</label><input id="imp-n" type="text" value="${esc(m.name)}" placeholder="พิมพ์ชื่อร้าน"></div>
+    ${m.addr?`<p class="sub" style="font-size:12px">${esc(m.addr)}</p>`:''}
+    <div class="row2"><div class="field"><label for="imp-c">หมวด</label><select id="imp-c">${CAT_KEYS.map(k=>`<option value="${k}"${k===m.cat?' selected':''}>${CAT[k].label}</option>`).join('')}</select></div>
+      <div class="field"><label for="imp-l">ตำแหน่ง</label>${m.ll
+        ? `<div class="fact" style="background:var(--accent-soft)">พบพิกัดแล้ว${d!==null?` · ห่าง ${fmtD(d)}`:''}</div>`
+        : `<select id="imp-l">${S.pos?'<option value="gps">ตำแหน่งปัจจุบัน (GPS)</option>':''}${stops.map(s=>`<option value="${s.id}"${S.anchor===s.id?' selected':''}>ใกล้ ${esc(s.n)}</option>`).join('')}</select>`}</div></div>
+    ${!m.ll ? `<p class="msg">${settings.url ? 'หาพิกัดจากลิงก์ไม่เจอ' : 'ลิงก์แบบย่อต้องเชื่อม Google Sheet ก่อนถึงจะอ่านพิกัดได้'} เลือกตำแหน่งใกล้เคียงแทน (ปุ่มนำทางยังเปิดร้านถูกตัว)${m.note2?' · '+esc(m.note2):''}</p>` : ''}
+    ${d!==null && d>30000 ? `<p class="msg" style="color:var(--warn)">ร้านนี้อยู่ไกลจากจุดอ้างอิง ${fmtD(d)} ตรวจว่าถูกร้าน</p>` : ''}
+    <div class="ctrl"><button class="btn pri" type="button" data-imp="main">+ ใส่ในแผน</button><button class="btn" type="button" data-imp="alt">+ แผนรอง</button><button class="btn ghost" type="button" data-imp="clear">ล้าง</button></div>`;
+}
+function bindImport(){
+  const t=$('#imp-t'); if(!t) return;
+  t.addEventListener('paste',()=>setTimeout(()=>runImport(t.value),0));
+  t.addEventListener('change',()=>runImport(t.value));
+  $('#imp-paste').onclick=async()=>{ try{ const v=await navigator.clipboard.readText(); t.value=v; runImport(v); }catch(e){ t.focus(); toast('กดค้างในช่องแล้วเลือก "วาง"'); } };
+  $('#impBox').addEventListener('click',e=>{ const b=e.target.closest('[data-imp]'); if(!b) return;
+    if(b.dataset.imp==='clear'){ S.imp=null; renderNear(); return; }
+    const m=S.imp; if(!m || m.err || m.loading) return;
+    const name=($('#imp-n').value||'').trim(); if(!name){ toast('ใส่ชื่อร้านก่อน'); $('#imp-n').focus(); return; }
+    let ll=m.ll;
+    if(!ll){ const v=$('#imp-l') && $('#imp-l').value; if(v==='gps' && S.pos) ll=[+S.pos.lat.toFixed(6),+S.pos.lng.toFixed(6)]; else { const st=findStop(v); ll = st ? st.ll : (anchorInfo()||{}).ll; } }
+    if(!ll){ toast('เลือกตำแหน่งก่อน'); return; }
+    const id='m_'+(m.url||name).split('').reduce((h,c)=>(h*31+c.charCodeAt(0))|0,7).toString(36);
+    LIVE[id]={id, cat:$('#imp-c').value, name, ja:name, ll, note:m.addr||'เพิ่มจาก Google Maps', url:m.url||m.longUrl||'', gmaps:true};
+    addToPlan(id, b.dataset.imp); S.imp=null; renderNear(); });
 }
 
 /* ============ EXPENSES ============ */
