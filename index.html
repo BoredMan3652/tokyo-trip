@@ -103,6 +103,9 @@ nav.tabs{flex:none;display:grid;grid-template-columns:repeat(5,1fr);background:v
 .leaflet-popup-content{margin:12px 14px;font:13px/1.45 var(--f-body);min-width:200px}
 .leaflet-container a.leaflet-popup-close-button{color:var(--muted)}
 .leaflet-control-attribution{font-size:9px}
+/* โหมดมืด: กลับสีภาพแผนที่ (เฉพาะพื้นแผนที่ หมุดไม่เปลี่ยน) */
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.9) saturate(.6)} }
+:root[data-theme="dark"] .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(.85) contrast(.9) saturate(.6)}
 .pop h4{margin:0 0 2px;font-size:14px}
 .pop p{margin:6px 0}
 .links{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
@@ -264,6 +267,8 @@ const EXP = 'Expenses';
 const LOC = 'Locations';
 const EXP_HEAD = ['id', 'วันที่-เวลา', 'วันที่ทริป', 'จำนวนเงิน', 'สกุลเงิน', 'เทียบบาท', 'หมวด', 'ชำระด้วย', 'รายละเอียด', 'lat', 'lng', 'อัปเดตล่าสุด'];
 const LOC_HEAD = ['เวลา', 'วันที่ทริป', 'lat', 'lng', 'ความแม่นยำ (ม.)', 'แผนที่'];
+const SET = 'Settings';
+const SET_HEAD = ['key', 'value', 'อัปเดตล่าสุด'];
 
 function sheet_(name, head) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -275,6 +280,20 @@ function sheet_(name, head) {
     sh.getRange(1, 1, 1, head.length).setFontWeight('bold').setBackground('#e8ecf6');
   }
   return sh;
+}
+
+// การตั้งค่ากลางของทริป (ทุกคนเห็นเหมือนกัน) เก็บเป็นข้อความล้วน
+function setSheet_() {
+  const sh = sheet_(SET, SET_HEAD);
+  sh.getRange('A:B').setNumberFormat('@');
+  return sh;
+}
+function readSettings_() {
+  const sh = setSheet_();
+  const n = sh.getLastRow() - 1;
+  const o = {};
+  if (n > 0) sh.getRange(2, 1, n, 2).getDisplayValues().forEach(function (r) { if (r[0] !== '') o[r[0]] = r[1]; });
+  return o;
 }
 
 function out_(o) {
@@ -314,6 +333,18 @@ function doPost(e) {
       return out_({ ok: true });
     }
 
+    if (d.action === 'settings') {
+      const sh = setSheet_();
+      const ids = ids_(sh);
+      Object.keys(d.values || {}).forEach(function (k) {
+        const row = [k, String(d.values[k]), new Date()];
+        const i = ids.indexOf(k);
+        if (i >= 0) sh.getRange(i + 2, 1, 1, 3).setValues([row]);
+        else { sh.appendRow(row); ids.push(k); }
+      });
+      return out_({ ok: true, settings: readSettings_() });
+    }
+
     if (d.action === 'loc') {
       const sh = sheet_(LOC, LOC_HEAD);
       const rows = d.items.map(function (p) {
@@ -333,6 +364,7 @@ function doPost(e) {
 
 function doGet(e) {
   if (SECRET && (!e.parameter || e.parameter.key !== SECRET)) return out_({ ok: false, error: 'รหัสลับไม่ถูกต้อง' });
+  if (e.parameter && e.parameter.type === 'settings') return out_({ ok: true, settings: readSettings_() });
   const sh = sheet_(EXP, EXP_HEAD);
   const n = sh.getLastRow() - 1;
   const vals = n > 0 ? sh.getRange(2, 1, n, EXP_HEAD.length).getValues() : [];
@@ -624,7 +656,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;',
 function load(k,d){ try{ const v=localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } }
 function save(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
 
-const settings = Object.assign({url:'', key:'', start:'', rate:0.22, budget:0, gpsAuto:false, logLoc:false, logMin:10, wake:false}, load('jt.settings',{}));
+const settings = Object.assign({url:'', key:'', start:'', rate:0.22, budget:0, gpsAuto:false, logLoc:false, logMin:10, wake:false, map:'esri'}, load('jt.settings',{}));
 let expenses = load('jt.exp', []);
 let pendingDel = load('jt.del', []);
 let locQ = load('jt.locq', []);
@@ -768,12 +800,21 @@ const dark = ()=> document.documentElement.dataset.theme ? document.documentElem
 function initMap(){
   if(!window.L){ $('#map').innerHTML='<div class="map-off">โหลดแผนที่ไม่ได้ ตรวจสอบอินเทอร์เน็ต แท็บอื่นยังใช้งานได้ตามปกติ</div>'; return; }
   map = L.map('map',{zoomControl:false, attributionControl:true}).setView([35.69,139.75],12);
-  setTiles(); matchMedia('(prefers-color-scheme: dark)').addEventListener('change', setTiles);
+  setTiles();
   lyStops=L.layerGroup().addTo(map); lyPOI=L.layerGroup().addTo(map);
 }
+// แผนที่ฟรีไม่ต้องใช้ API Key: Esri เป็นหลัก (ใช้ได้ทั้งเปิดผ่านเว็บและเปิดไฟล์ตรงๆ) / OpenStreetMap สำรอง
+const TILE_SRC = [
+  {u:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', a:'Tiles © Esri', max:19},
+  {u:'https://tile.openstreetmap.org/{z}/{x}/{y}.png', a:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>', max:19}
+];
+let tileIdx = settings.map==='osm' ? 1 : 0, tileTried=new Set(), tileErr=0, tileOk=0;
 function setTiles(){ if(!map) return; if(tiles) map.removeLayer(tiles);
-  const u = dark() ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png' : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
-  tiles = L.tileLayer(u,{maxZoom:20, subdomains:'abcd', attribution:'© OpenStreetMap © CARTO'}).addTo(map); }
+  const src=TILE_SRC[tileIdx]; tileTried.add(tileIdx); tileErr=0; tileOk=0;
+  tiles = L.tileLayer(src.u,{maxZoom:20, maxNativeZoom:src.max, attribution:src.a, crossOrigin:false});
+  tiles.on('tileload',()=>{ tileOk++; });
+  tiles.on('tileerror',()=>{ if(++tileErr>=4 && tileOk===0){ const nx=TILE_SRC.findIndex((_,i)=>!tileTried.has(i)); if(nx>=0){ tileIdx=nx; setTiles(); } } });
+  tiles.addTo(map); }
 
 function poiPopup(p){ const d = S.pos ? dist([S.pos.lat,S.pos.lng],p.ll) : null;
   return `<div class="pop"><span class="label">${CAT[p.cat].label}</span><h4>${esc(p.name)}</h4><div class="jp">${esc(p.ja)}</div>${p.note?`<p>${esc(p.note)}</p>`:''}${d!==null?`<p class="num">${fmtD(d)} · เดิน ~${walk(d)} นาที</p>`:''}
@@ -985,72 +1026,140 @@ async function sync(manual){
   }catch(err){ S.syncErr='ซิงก์ไม่สำเร็จ: '+(err.message||err)+' — ตรวจ URL / สิทธิ์ "ทุกคน" ในการ Deploy'; if(manual) toast('ซิงก์ไม่สำเร็จ'); }
   S.syncing=false; renderStatus(); if(S.tab==='exp') renderExp();
 }
-async function pull(){
-  if(!settings.url){ toast('ตั้งค่า URL ก่อน'); go('set'); return; }
-  try{ const r=await fetch(settings.url + (settings.url.includes('?')?'&':'?') + 'key=' + encodeURIComponent(settings.key)); const j=await r.json(); if(!j.ok) throw new Error(j.error);
+async function pull(silent){
+  if(!settings.url){ if(!silent){ toast('ตั้งค่า URL ก่อน'); go('set'); } return; }
+  try{ const r=await fetch(gsUrl()); const j=await r.json(); if(!j.ok) throw new Error(j.error);
     const have=new Set(expenses.map(x=>x.id)); let n=0;
     j.items.forEach(it=>{ if(!it.id || have.has(it.id) || pendingDel.includes(it.id)) return; n++;
       expenses.push({id:it.id, ts:it.ts||Date.now(), day:+it.day||1, amount:+it.amount, cur:it.cur==='THB'?'THB':'JPY', cat:keyOf(EXC,it.cat), pay:keyOf(PAY,it.pay), note:it.note||'', lat:it.lat||'', lng:it.lng||'', synced:true}); });
-    save('jt.exp',expenses); toast(n ? `ดึงมา ${n} รายการ` : 'ไม่มีรายการใหม่ใน Sheet'); renderExp(); renderStatus();
-  }catch(err){ toast('ดึงข้อมูลไม่สำเร็จ'); }
+    save('jt.exp',expenses); if(!silent || n) toast(n ? `ดึงรายจ่ายจาก Sheet มา ${n} รายการ` : 'ไม่มีรายการใหม่ใน Sheet'); if(S.tab==='exp') renderExp(); renderStatus();
+  }catch(err){ if(!silent) toast('ดึงข้อมูลไม่สำเร็จ'); }
 }
-window.addEventListener('online',()=>sync());
-setInterval(()=>sync(),60000);
+window.addEventListener('online',()=>{ sync(); pullSettings(); });
+setInterval(()=>{ sync(); pullSettings(); },60000);
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'){ pullSettings(); pull(true); } });
 
 /* ============ SETTINGS ============ */
+// ค่าที่ใช้ร่วมกันทุกคน (เก็บในแท็บ Settings ของ Google Sheet) — ค่าอื่นเป็นของเครื่องใครเครื่องมัน
+const GLOBAL_KEYS = ['start','rate','budget','logLoc','logMin'];
+const GCONV = {start:v=>String(v||''), rate:v=>parseFloat(v)||0.22, budget:v=>parseFloat(v)||0, logLoc:v=>String(v)==='true', logMin:v=>parseInt(v,10)||10};
+function gsUrl(type){ return settings.url + (settings.url.includes('?')?'&':'?') + (type?'type='+type+'&':'') + 'key=' + encodeURIComponent(settings.key||''); }
+function applyGlobal(o){
+  let ch=false;
+  GLOBAL_KEYS.forEach(k=>{ if(o[k]===undefined || o[k]==='') return; const v=GCONV[k](o[k]); if(settings[k]!==v){ settings[k]=v; ch=true; } });
+  if(ch){ save('jt.settings',settings); const ad=autoDay(); if(ad) S.day=ad; renderDays(); renderStatus();
+    const typing = S.tab==='set' && $('#setPad').contains(document.activeElement);
+    if(!typing) renderTab(); }
+  return ch;
+}
+async function pullSettings(){
+  if(!settings.url || !navigator.onLine) return;
+  try{ const r=await fetch(gsUrl('settings')); const j=await r.json();
+    if(!j.ok) throw new Error(j.error||'');
+    if(!j.settings) throw new Error('old');
+    S.globalAt=Date.now(); S.globalErr='';
+    if(applyGlobal(j.settings) && S.globalLoaded) toast('มีคนปรับการตั้งค่ากลาง อัปเดตแล้ว');
+    S.globalLoaded=true;
+  }catch(e){ S.globalErr = e.message==='old' ? 'Code.gs ใน Sheet ยังเป็นเวอร์ชันเก่า ให้วางโค้ดใหม่แล้ว Deploy เป็นเวอร์ชันใหม่' : 'ดึงการตั้งค่ากลางไม่สำเร็จ'; }
+  updateGlobalMsg();
+}
+async function pushSettings(keys){
+  if(!keys.length) return;
+  if(!settings.url){ updateGlobalMsg(); return; }
+  const values={}; keys.forEach(k=>values[k]=settings[k]);
+  try{ const j=await post({action:'settings', values}); S.globalAt=Date.now(); S.globalErr=''; if(j.settings) applyGlobal(j.settings);
+    toast('บันทึกแล้ว ทุกคนในทริปจะเห็นค่านี้'); }
+  catch(e){ S.globalErr='บันทึกการตั้งค่ากลางไม่สำเร็จ: '+(e.message||e); toast('บันทึกการตั้งค่ากลางไม่สำเร็จ'); }
+  updateGlobalMsg();
+}
+function updateGlobalMsg(){ const m=$('#g-msg'); if(!m) return;
+  m.textContent = !settings.url ? 'ยังไม่เชื่อม Google Sheet ตอนนี้ค่าเหล่านี้ใช้เฉพาะเครื่องนี้'
+    : S.globalErr ? S.globalErr
+    : S.globalAt ? 'ตรงกับ Google Sheet แล้ว · เช็คล่าสุด '+new Date(S.globalAt).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})
+    : 'กำลังเชื่อมต่อ…'; }
+function inviteLink(){ return location.origin + location.pathname + '#sheet=' + encodeURIComponent(settings.url) + (settings.key ? '&key=' + encodeURIComponent(settings.key) : ''); }
+async function copyText(t, el){ try{ await navigator.clipboard.writeText(t); toast('คัดลอกแล้ว'); }
+  catch(e){ if(el){ const r=document.createRange(); r.selectNodeContents(el); const s=getSelection(); s.removeAllRanges(); s.addRange(r); } toast('เลือกข้อความแล้ว กดคัดลอกเอง'); } }
+
 function renderSet(){
   const code = $('#gsCode').textContent.trim();
+  const box = 'class="card" style="display:flex;flex-direction:column;gap:12px"';
   $('#setPad').innerHTML = `
     <h2>ตั้งค่า</h2>
-    <div class="card" style="display:flex;flex-direction:column;gap:12px">
-      <h3>ทริป</h3>
+    <div ${box}>
+      <div class="planbar"><h3>ตั้งค่าทริป</h3><span class="tag on">ทุกคนเห็นเหมือนกัน</span></div>
       <div class="row2"><div class="field"><label for="s-start">วันแรกของทริป</label><input id="s-start" type="date" value="${esc(settings.start)}"><span class="hint">เลือกวันอัตโนมัติ + ไฮไลต์จุดตามเวลา</span></div>
         <div class="field"><label for="s-rate">เรท 1 เยน = ? บาท</label><input id="s-rate" type="number" step="0.0001" inputmode="decimal" value="${settings.rate}"><span class="hint">อัปเดตตามเรทจริงก่อนเดินทาง</span></div></div>
       <div class="field"><label for="s-bud">งบทั้งทริป (บาท)</label><input id="s-bud" type="number" inputmode="numeric" value="${settings.budget||''}" placeholder="เช่น 30000"></div>
-    </div>
-    <div class="card" style="display:flex;flex-direction:column;gap:12px">
-      <h3>ตำแหน่ง</h3>
-      <div class="switch"><div><b style="font-size:14px">ส่งตำแหน่งลง Sheet</b><div class="hint" style="font-size:12px;color:var(--muted)">บันทึกลงแท็บ Locations ระหว่างที่แอปเปิดอยู่</div></div><input id="s-log" type="checkbox" ${settings.logLoc?'checked':''}></div>
+      <div class="switch"><div><b style="font-size:14px">ส่งตำแหน่งลง Sheet</b><div class="hint" style="font-size:12px;color:var(--muted)">ทุกเครื่องที่เปิดแอปอยู่จะส่งตำแหน่งลงแท็บ Locations</div></div><input id="s-log" type="checkbox" ${settings.logLoc?'checked':''}></div>
       <div class="field"><label for="s-min">ส่งทุกกี่นาที</label><select id="s-min">${[5,10,15,30].map(m=>`<option ${settings.logMin==m?'selected':''} value="${m}">${m} นาที</option>`).join('')}</select></div>
-      <div class="switch"><div><b style="font-size:14px">กันหน้าจอดับ</b><div class="hint" style="font-size:12px;color:var(--muted)">เบราว์เซอร์หยุด GPS เมื่อจอดับ เปิดไว้ถ้าต้องการติดตามต่อเนื่อง (กินแบต)</div></div><input id="s-wake" type="checkbox" ${settings.wake?'checked':''}></div>
+      <p class="msg" id="g-msg"></p>
     </div>
-    <div class="card" style="display:flex;flex-direction:column;gap:12px">
-      <h3>เชื่อม Google Sheet</h3>
+
+    <div ${box}>
+      <div class="planbar"><h3>เชื่อม Google Sheet</h3><span class="tag">เครื่องนี้</span></div>
       <div class="field"><label for="s-url">Web app URL (ลงท้าย /exec)</label><input id="s-url" type="url" value="${esc(settings.url)}" placeholder="https://script.google.com/macros/s/…/exec"></div>
       <div class="field"><label for="s-key">รหัสลับ (ถ้าตั้งใน SECRET)</label><input id="s-key" type="password" value="${esc(settings.key)}"></div>
-      <div class="ctrl"><button class="btn pri" type="button" id="s-save">บันทึกการตั้งค่า</button><button class="btn" type="button" id="s-test">ทดสอบการเชื่อมต่อ</button></div>
+      <div class="ctrl"><button class="btn pri" type="button" id="s-save">บันทึกและเชื่อมต่อ</button><button class="btn" type="button" id="s-test">ทดสอบการเชื่อมต่อ</button></div>
       <p class="msg" id="s-msg"></p>
+      ${settings.url ? `<div class="field"><label for="s-inv">ลิงก์เชิญเพื่อนร่วมทริป</label>
+        <div class="amt" style="grid-template-columns:1fr auto"><input id="s-inv" type="text" readonly value="${esc(inviteLink())}"><button class="btn" type="button" id="s-invcopy">คัดลอก</button></div>
+        <span class="hint">ส่งทาง LINE ให้เพื่อนเปิดครั้งเดียว แอปของเพื่อนจะเชื่อม Sheet เดียวกันเอง ไม่ต้องกรอก URL · ลิงก์นี้มีรหัสเข้า Sheet อย่าโพสต์สาธารณะ</span></div>` : ''}
       <ol class="steps">
         <li>สร้าง Google Sheet ใหม่ → เมนู <b>ส่วนขยาย → Apps Script</b></li>
         <li>ลบโค้ดเดิม วางโค้ดด้านล่าง แล้วกดบันทึก</li>
         <li><b>ทำให้ใช้งานได้ → การทำให้ใช้งานได้รายการใหม่</b> → ประเภท <b>เว็บแอป</b> · ดำเนินการในฐานะ <b>ฉัน</b> · ผู้มีสิทธิ์เข้าถึง <b>ทุกคน</b></li>
-        <li>กดอนุญาตสิทธิ์ แล้วคัดลอก URL ที่ลงท้าย <b>/exec</b> มาวางด้านบน → ทดสอบ</li>
+        <li>กดอนุญาตสิทธิ์ แล้วคัดลอก URL ที่ลงท้าย <b>/exec</b> มาวางด้านบน → บันทึกและเชื่อมต่อ</li>
+        <li>ถ้าเคย Deploy แล้ว: วางโค้ดใหม่ → <b>ทำให้ใช้งานได้ → จัดการการทำให้ใช้งานได้ → แก้ไข → เวอร์ชันใหม่</b> (URL เดิม)</li>
       </ol>
       <div class="ctrl" style="justify-content:space-between"><span class="label">Code.gs</span><button class="btn sm" type="button" id="s-copy">คัดลอกโค้ด</button></div>
       <pre class="code" id="s-code">${esc(code)}</pre>
     </div>
-    <p class="sub">ข้อมูลทั้งหมดเก็บในเครื่องนี้ก่อนเสมอ ออฟไลน์ก็บันทึกได้ แล้วจะซิงก์เมื่อมีเน็ต · พิกัดสถานที่เป็นค่าประมาณ ปุ่ม "นำทาง" จะค้นชื่อจริงใน Google Maps</p>`;
-  const saveSet=()=>{ settings.start=$('#s-start').value; settings.rate=parseFloat($('#s-rate').value)||0.22; settings.budget=parseFloat($('#s-bud').value)||0;
-    settings.url=$('#s-url').value.trim(); settings.key=$('#s-key').value; settings.logLoc=$('#s-log').checked; settings.logMin=+$('#s-min').value; settings.wake=$('#s-wake').checked;
-    save('jt.settings',settings); keepAwake(settings.wake && S.watchId!==null); const ad=autoDay(); if(ad) S.day=ad; renderDays(); renderStatus(); };
-  ['s-start','s-rate','s-bud','s-url','s-key','s-log','s-min','s-wake'].forEach(id=>$('#'+id).addEventListener('change',saveSet));
-  $('#s-save').onclick=()=>{ saveSet(); toast('บันทึกการตั้งค่าแล้ว'); sync(); };
-  $('#s-test').onclick=async()=>{ saveSet(); const m=$('#s-msg'); if(!settings.url){ m.textContent='ใส่ URL ก่อน'; return; } m.textContent='กำลังทดสอบ…';
-    try{ const r=await fetch(settings.url+(settings.url.includes('?')?'&':'?')+'key='+encodeURIComponent(settings.key)); const j=await r.json();
-      m.textContent = j.ok ? `เชื่อมต่อสำเร็จ · ใน Sheet มี ${j.items.length} รายการ` : 'เชื่อมต่อได้แต่: '+j.error; if(j.ok) sync(); }
-    catch(e){ m.textContent='เชื่อมต่อไม่ได้ — ตรวจว่า URL ลงท้าย /exec และตั้งสิทธิ์ "ทุกคน"'; } };
-  $('#s-copy').onclick=async()=>{ try{ await navigator.clipboard.writeText(code); toast('คัดลอกโค้ดแล้ว'); }
-    catch(e){ const r=document.createRange(); r.selectNodeContents($('#s-code')); const s=getSelection(); s.removeAllRanges(); s.addRange(r); toast('เลือกข้อความแล้ว กดคัดลอกเอง'); } };
+
+    <div ${box}>
+      <div class="planbar"><h3>การแสดงผลในเครื่องนี้</h3><span class="tag">เครื่องนี้</span></div>
+      <div class="field"><label for="s-map">แบบแผนที่</label><select id="s-map">
+        <option value="esri" ${settings.map!=='osm'?'selected':''}>Esri Street Map (ชื่อภาษาอังกฤษ)</option>
+        <option value="osm" ${settings.map==='osm'?'selected':''}>OpenStreetMap (ชื่อภาษาญี่ปุ่น)</option></select>
+        <span class="hint">ถ้าแผนที่ไม่ขึ้น ลองสลับแบบ</span></div>
+      <div class="switch"><div><b style="font-size:14px">กันหน้าจอดับ</b><div class="hint" style="font-size:12px;color:var(--muted)">เบราว์เซอร์หยุด GPS เมื่อจอดับ เปิดไว้ถ้าต้องการติดตามต่อเนื่อง (กินแบต)</div></div><input id="s-wake" type="checkbox" ${settings.wake?'checked':''}></div>
+    </div>
+    <p class="sub">รายจ่ายและการตั้งค่าเก็บในเครื่องก่อนเสมอ ออฟไลน์ก็ใช้ได้ แล้วจะซิงก์เมื่อมีเน็ต · พิกัดสถานที่เป็นค่าประมาณ ปุ่ม "นำทาง" จะค้นชื่อจริงใน Google Maps</p>`;
+  updateGlobalMsg();
+
+  // ตั้งค่ากลาง → บันทึกในเครื่อง + ส่งขึ้น Sheet
+  const saveGlobal=()=>{ const before=Object.fromEntries(GLOBAL_KEYS.map(k=>[k,settings[k]]));
+    settings.start=$('#s-start').value; settings.rate=parseFloat($('#s-rate').value)||0.22; settings.budget=parseFloat($('#s-bud').value)||0;
+    settings.logLoc=$('#s-log').checked; settings.logMin=+$('#s-min').value;
+    save('jt.settings',settings); const ad=autoDay(); if(ad) S.day=ad; renderDays(); renderStatus();
+    pushSettings(GLOBAL_KEYS.filter(k=>before[k]!==settings[k])); };
+  ['s-start','s-rate','s-bud','s-log','s-min'].forEach(id=>$('#'+id).addEventListener('change',saveGlobal));
+  // เฉพาะเครื่อง
+  const saveConn=()=>{ settings.url=$('#s-url').value.trim(); settings.key=$('#s-key').value; save('jt.settings',settings); renderStatus(); };
+  ['s-url','s-key'].forEach(id=>$('#'+id).addEventListener('change',saveConn));
+  $('#s-map').onchange=e=>{ settings.map=e.target.value; save('jt.settings',settings); tileIdx = settings.map==='osm'?1:0; tileTried=new Set(); setTiles(); toast('เปลี่ยนแบบแผนที่แล้ว'); };
+  $('#s-wake').onchange=e=>{ settings.wake=e.target.checked; save('jt.settings',settings); keepAwake(settings.wake && S.watchId!==null); };
+  $('#s-save').onclick=async()=>{ saveConn(); if(!settings.url){ toast('ใส่ URL ก่อน'); return; } toast('กำลังเชื่อมต่อ…'); S.globalLoaded=false; await pullSettings(); sync(); pull(true); renderSet(); };
+  $('#s-test').onclick=async()=>{ saveConn(); const m=$('#s-msg'); if(!settings.url){ m.textContent='ใส่ URL ก่อน'; return; } m.textContent='กำลังทดสอบ…';
+    try{ const r=await fetch(gsUrl()); const j=await r.json();
+      m.textContent = j.ok ? `เชื่อมต่อสำเร็จ · ใน Sheet มีรายจ่าย ${j.items.length} รายการ` : 'เชื่อมต่อได้แต่: '+j.error; if(j.ok){ sync(); pullSettings(); } }
+    catch(e){ m.textContent='เชื่อมต่อไม่ได้ ตรวจว่า URL ลงท้าย /exec และตั้งสิทธิ์ "ทุกคน"'; } };
+  $('#s-copy').onclick=()=>copyText(code, $('#s-code'));
+  const ic=$('#s-invcopy'); if(ic) ic.onclick=()=>copyText(inviteLink(), $('#s-inv'));
 }
 
 /* ============ BOOT ============ */
+// เปิดจากลิงก์เชิญ: #sheet=<url>&key=<รหัส>
+(function(){ const h=location.hash.slice(1); if(!h.includes('sheet=')) return;
+  const q=new URLSearchParams(h); const u=q.get('sheet'); if(u && /^https:\/\/script\.google\.com\//.test(u)){ settings.url=u; settings.key=q.get('key')||''; save('jt.settings',settings); setTimeout(()=>toast('เชื่อมต่อ Google Sheet ของทริปแล้ว'),300); }
+  try{ history.replaceState(null,'',location.pathname+location.search); }catch(e){} })();
 if(!DAYS[S.day-1]) S.day=1;
 S.anchor = (plan(S.day).stops.find(s=>!s.mv)||{}).id || 'gps';
 go(['map','plan','near','exp','set'].includes(S.tab) ? S.tab : 'map');
 renderDays(); renderStatus();
 if(settings.gpsAuto) startGPS();
 setInterval(()=>{ if(S.tab==='plan' && !S.editMode) renderPlan(); }, 60000);
-sync();
+sync(); pullSettings(); pull(true);
 </script>
 </body>
 </html>
