@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="th">
+<html lang="th" data-theme="light">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
@@ -7,8 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Tokyo Trip">
-<meta name="theme-color" content="#f3f4f7" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#11151f" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" id="themeColor" content="#f3f4f7">
 <title>Tokyo–Kamakura Trip</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -52,7 +51,10 @@ a{color:var(--accent)}
 /* Header */
 header{background:var(--surface);border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top,0px);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));flex:none;z-index:5}
 .top{display:flex;align-items:center;gap:8px;padding-block:10px 6px}
+.iconbtn{flex:none;width:32px;height:32px;border-radius:50%;border:1px solid var(--line);background:var(--bg);display:grid;place-items:center;padding:0}
+.iconbtn svg{width:17px;height:17px;stroke:var(--ink);fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
 .brand{font-weight:700;letter-spacing:.02em;font-size:15px;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+@media (max-width:430px){ .brand small{display:none} }
 .brand small{font-weight:500;color:var(--muted);font-size:12px;margin-left:6px}
 .pill{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:4px 10px;font-size:12px;white-space:nowrap}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
@@ -83,7 +85,15 @@ nav.tabs{flex:none;display:grid;grid-template-columns:repeat(5,1fr);background:v
 .tab[aria-selected="true"]{color:var(--accent);font-weight:600}
 
 /* Map */
-#map{position:absolute;inset:0;background:var(--sunk)}
+#map,#gmap{position:absolute;inset:0;background:var(--sunk)}
+.gm-style .gm-style-iw-c{background:var(--surface)!important;color:var(--ink);padding:0!important}
+.gm-style .gm-style-iw-d{overflow:auto!important;padding:12px 14px 2px!important}
+.gm-style .gm-style-iw-tc::after{background:var(--surface)!important}
+.gm-style .gm-ui-hover-effect>span{background-color:var(--muted)!important}
+.gm-style .pop{font:13px/1.45 var(--f-body);min-width:200px;max-width:260px}
+.livebadge{font-size:11px;font-weight:600;padding:1px 7px;border-radius:999px;background:var(--sunk);color:var(--muted)}
+.livebadge.open{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}
+.livebadge.closed{background:color-mix(in srgb,var(--bad) 14%,transparent);color:var(--bad)}
 .map-tools{position:absolute;z-index:500;top:10px;left:max(10px,env(safe-area-inset-left,0px));right:max(10px,env(safe-area-inset-right,0px));display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;pointer-events:none}
 .map-tools>*{pointer-events:auto}
 .chip{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 11px;font-size:12px;display:inline-flex;align-items:center;gap:6px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
@@ -171,6 +181,9 @@ select,input[type=text],input[type=number],input[type=url],input[type=date],inpu
 .stop{grid-template-columns:auto 20px 1fr}
 .stop .t{min-width:44px}
 .stop.added .rail span{border-color:var(--accent)}
+.ein{width:100%;border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:8px;padding:6px 9px;font:inherit;font-size:14px;margin-bottom:6px;resize:vertical}
+.ein[data-f="n"]{font-weight:600}
+textarea{font:inherit}
 .alts{display:flex;flex-direction:column;gap:10px}
 .plist.flat{border:0;border-radius:0;background:transparent;margin-inline:-14px;margin-bottom:-14px;border-top:1px solid var(--line)}
 .pin-alt{width:34px;height:20px;border-radius:10px;display:grid;place-items:center;background:var(--surface);color:var(--accent);font:600 10px/1 var(--f-body);border:2px dashed var(--accent);box-shadow:0 1px 4px rgba(0,0,0,.3)}
@@ -224,6 +237,7 @@ pre.code{margin:0;max-height:240px;overflow:auto;background:var(--sunk);border-r
 <header>
   <div class="top">
     <div class="brand">Tokyo Trip<small>5 วัน</small></div>
+    <button class="iconbtn" id="themeBtn" type="button" aria-label="เปลี่ยนธีม"></button>
     <button class="pill" id="gpsPill" type="button"><span class="dot" id="gpsDot"></span><span id="gpsTxt">GPS ปิด</span></button>
     <button class="pill" id="syncPill" type="button"><span class="dot" id="syncDot"></span><span id="syncTxt">Sheet</span></button>
   </div>
@@ -233,6 +247,7 @@ pre.code{margin:0;max-height:240px;overflow:auto;background:var(--sunk);border-r
 <main>
   <section class="view" id="v-map" style="overflow:hidden">
     <div id="map"></div>
+    <div id="gmap" hidden></div>
     <div class="map-tools" id="mapCats"></div>
     <div class="map-zones" id="mapZones"></div>
     <button class="fab" id="locate" type="button" aria-label="ไปที่ตำแหน่งฉัน"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
@@ -378,6 +393,14 @@ function doGet(e) {
 }</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
+/* ============ THEME (ค่าเริ่มต้น: ขาว) ============ */
+function applyTheme(t){ t = t==='dark' ? 'dark' : 'light'; document.documentElement.dataset.theme=t;
+  const m=document.getElementById('themeColor'); if(m) m.content = t==='dark' ? '#11151f' : '#f3f4f7';
+  const b=document.getElementById('themeBtn'); if(b){ b.setAttribute('aria-label', t==='dark'?'เปลี่ยนเป็นธีมขาว':'เปลี่ยนเป็นธีมดำ'); b.innerHTML = t==='dark'
+    ? '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>'
+    : '<svg viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>'; } }
+try{ applyTheme((JSON.parse(localStorage.getItem('jt.settings')||'{}')).theme); }catch(e){ applyTheme('light'); }
+
 /* ============ DATA ============ */
 const CAT = {
   f:{label:'ร้านอาหาร', glyph:'食', g:'restaurants'},
@@ -545,7 +568,7 @@ const RAW = [
 const P = RAW.map((r,i)=>({id:'p'+i,cat:r[0],area:r[1],name:r[2],ja:r[3],ll:[r[4],r[5]],note:r[6]||''}));
 
 const L_ = { // shortcuts for stop coordinates
-  nrt:[35.7643,140.3863], shina:[35.6285,139.7387], shinaK:[35.6278,139.7381], hara:[35.6702,139.7027], asaG:[35.7110,139.7975], asaT:[35.7097,139.7972], omo:[35.6653,139.7123],
+  nrt:[35.7643,140.3863], shibSt:[35.6580,139.7016], miya:[35.6620,139.7020], shina:[35.6285,139.7387], shinaK:[35.6278,139.7381], hara:[35.6702,139.7027], asaG:[35.7110,139.7975], asaT:[35.7097,139.7972], omo:[35.6653,139.7123],
   take:[35.6714,139.7047], cat:[35.6650,139.7060], scr:[35.6595,139.7005], sky:[35.6584,139.7022], shibF:[35.6610,139.6995],
   kmk:[35.3190,139.5503], koma:[35.3203,139.5513], hachi:[35.3260,139.5563], hase:[35.3117,139.5353], buddha:[35.3168,139.5357],
   hasedera:[35.3125,139.5332], koko:[35.3065,139.5004], eno:[35.2995,139.4805], enoSt:[35.3058,139.4880],
@@ -556,20 +579,22 @@ const L_ = { // shortcuts for stop coordinates
 };
 
 const DAYS = [
- { title:'นาริตะ → ชินากาวะ → ฮาราจูกุ–ชิบูย่า', short:'ชิบูย่า', areas:['nrt_ap','shinagawa','harajuku','shibuya'], zone:'tyo',
+ { title:'นาริตะ → ชิบูย่า → ชินากาวะ', short:'ชิบูย่า', areas:['nrt_ap','shibuya','harajuku','shinagawa'], zone:'tyo',
    facts:[['เดินรวม','~2 กม.'],['ตั๋วที่ต้องจอง','N\'EX + SHIBUYA SKY'],['ที่พัก','ชินากาวะ']],
    stops:[
-    {t:'12:00', z:'nrt', n:'ออกจากสนามบินนาริตะ', ll:L_.nrt, mv:1, note:'N\'EX ไปสถานีชินากาวะตรง ~75 นาที (ที่นั่งจอง มีที่วางกระเป๋า) หรือ Keisei Access Express ขบวนที่ไปถึงชินากาวะ ~90 นาที ถูกกว่า ใช้ Suica ได้'},
-    {t:'13:20', z:'tyo', n:'ที่พักย่านสถานีชินากาวะ: ฝากกระเป๋า', ll:L_.shina, note:'เช็คอินได้ 15:00 แต่โรงแรมรับฝากกระเป๋าก่อนได้ จะได้เดินตัวเปล่า'},
-    {t:'13:45', z:'tyo', n:'JR Yamanote → สถานีฮาราจูกุ', ll:L_.hara, mv:1, note:'สายเดียวตรง ~17 นาที'},
-    {t:'14:15', z:'tyo', n:'ถนนทาเคชิตะ → โอโมเตะซันโด', ll:L_.take, note:'เครปทาเคชิตะ แล้วเลี้ยวเข้าโอโมเตะซันโด ผ่านดาดฟ้า Omokado, Omotesando Hills (~1 กม.)'},
-    {t:'15:15', z:'tyo', n:'แคทสตรีท → Miyashita Park', ll:L_.cat, note:'ทางเดินร้านแบรนด์สตรีทสู่ชิบูย่า (~1 กม.)'},
-    {t:'16:00', z:'tyo', n:'ทางม้าลาย Scramble + ฮาจิโกะ', ll:L_.scr, note:'ถ่ายรูปทางม้าลาย แล้วเดินเข้าอาคาร Shibuya Scramble Square'},
+    {t:'12:00', z:'nrt', n:'ออกจากสนามบินนาริตะ → ชิบูย่า', ll:L_.nrt, mv:1, note:'N\'EX ไปสถานีชิบูย่าตรง ~80 นาที ไม่ต้องเปลี่ยนรถ (ที่นั่งจอง มีที่วางกระเป๋า)'},
+    {t:'13:30', z:'tyo', n:'ถึงชิบูย่า: ฝากกระเป๋าที่ล็อกเกอร์', ll:L_.shibSt, q:'渋谷駅 コインロッカー', note:'ล็อกเกอร์ขนาดใหญ่ในสถานีเต็มเร็ว ถ้าไม่ว่างใช้บริการรับฝากกระเป๋า (จองผ่านแอปล่วงหน้าได้)'},
+    {t:'13:50', z:'tyo', n:'ทางม้าลาย Scramble + ฮาจิโกะ', ll:L_.scr, q:'渋谷スクランブル交差点'},
+    {t:'14:10', z:'tyo', n:'Center Gai → Miyashita Park', ll:L_.miya, q:'ミヤシタパーク', note:'Shibuya Yokocho และ Parco (Nintendo/Pokémon) อยู่ระหว่างทาง'},
+    {t:'14:40', z:'tyo', n:'แคทสตรีท → โอโมเตะซันโด', ll:L_.cat, q:'キャットストリート', note:'ทางเดินร้านแบรนด์สตรีท (~1 กม.) แวะดาดฟ้า Omokado'},
+    {t:'15:30', z:'tyo', n:'ถนนทาเคชิตะ (ฮาราจูกุ)', ll:L_.take, q:'竹下通り', note:'เครปทาเคชิตะ ร้านของน่ารัก'},
+    {t:'16:10', z:'tyo', n:'JR Yamanote ฮาราจูกุ → ชิบูย่า', ll:L_.hara, mv:1, note:'1 สถานี ~2 นาที'},
     {t:'16:30', z:'tyo', n:'SHIBUYA SKY (รอบพระอาทิตย์ตก)', ll:L_.sky, q:'渋谷スカイ', note:'จองรอบ 30–40 นาทีก่อนพระอาทิตย์ตก (กลาง ต.ค. ตกราว 17:05, พ.ย. ราว 16:35) อยู่บนดาดฟ้าประมาณ 1 ชม.'},
-    {t:'18:00', z:'tyo', n:'มื้อเย็น + ช็อปชิบูย่า', ll:L_.shibF, note:'Parco (Nintendo/Pokémon), MEGA Don Quijote, Shibuya Yokocho — ดูแท็บ "รอบตัว"'},
-    {t:'20:00', z:'tyo', n:'JR Yamanote กลับชินากาวะ → เช็คอิน', ll:L_.shina, mv:1, note:'จากชิบูย่าสายเดียวตรง ~13 นาที'}
+    {t:'18:00', z:'tyo', n:'มื้อเย็น + ช็อปชิบูย่า', ll:L_.shibF, note:'MEGA Don Quijote, Shibuya Yokocho, Tokyu Food Show — ดูแท็บ "รอบตัว"'},
+    {t:'19:45', z:'tyo', n:'รับกระเป๋า → JR Yamanote ไปชินากาวะ', ll:L_.shibSt, mv:1, note:'สายเดียวตรง ~13 นาที'},
+    {t:'20:15', z:'tyo', n:'เช็คอินที่พักย่านสถานีชินากาวะ', ll:L_.shina}
    ],
-   tips:['ถ้าอยากเช็คอินก่อนออกเที่ยว ให้สลับ: ถึงโรงแรม ~13:20 พักถึง 15:00 แล้วค่อยไปชิบูย่า (ยังทันรอบพระอาทิตย์ตก)',
+   tips:['กระเป๋าใหญ่หลายใบ ใช้บริการส่งกระเป๋าจากสนามบินไปโรงแรมที่ชินากาวะได้ (เคาน์เตอร์ในอาคารผู้โดยสาร) จะได้เดินชิบูย่าตัวเปล่า ถึงวันเดียวกันหรือวันถัดไปแล้วแต่เวลาฝาก',
          'ซื้อตั๋ว N\'EX ที่เคาน์เตอร์ JR ในสนามบิน หรือจองออนไลน์ล่วงหน้า (มีโปรตั๋วไป–กลับสำหรับนักท่องเที่ยว)',
          'ซื้อ Welcome Suica หรือเติม Suica ในมือถือ ใช้ได้ทั้งรถไฟ ร้านสะดวกซื้อ และล็อกเกอร์',
          'SHIBUYA SKY ดาดฟ้าปิดเมื่อฝนตกหรือลมแรง ตรวจสภาพอากาศก่อนจอง']
@@ -656,13 +681,13 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;',
 function load(k,d){ try{ const v=localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch(e){ return d; } }
 function save(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
 
-const settings = Object.assign({url:'', key:'', start:'', rate:0.22, budget:0, gpsAuto:false, logLoc:false, logMin:10, wake:false, map:'esri'}, load('jt.settings',{}));
+const settings = Object.assign({url:'', key:'', start:'', rate:0.22, budget:0, gpsAuto:false, logLoc:false, logMin:10, wake:false, mapSrc:'auto', gkey:'', theme:'light'}, load('jt.settings',{}));
 let expenses = load('jt.exp', []);
 let pendingDel = load('jt.del', []);
 let locQ = load('jt.locq', []);
 const S = { day: autoDay() || load('jt.day',1), tab: load('jt.tab','map'), anchor:'gps', radius:500, ncat:'f',
             mapCats:new Set(CAT_KEYS), pos:null, watchId:null, lastLog:0, syncing:false, syncErr:'', fitted:false, delAsk:null,
-            form:{cat:'food', pay:'cash', cur:'JPY'} };
+            form:{cat:'food', pay:'cash', cur:'JPY'}, nsrc:'live', gFail:false, gErr:'' };
 
 function dist(a,b){ const R=6371000, r=x=>x*Math.PI/180; const dLa=r(b[0]-a[0]), dLo=r(b[1]-a[1]);
   const h=Math.sin(dLa/2)**2 + Math.cos(r(a[0]))*Math.cos(r(b[0]))*Math.sin(dLo/2)**2; return 2*R*Math.asin(Math.sqrt(h)); }
@@ -672,7 +697,7 @@ const yen = n => '¥' + Math.round(n).toLocaleString('en-US');
 const baht = n => '฿' + Math.round(n).toLocaleString('en-US');
 const gq = p => p.ja || p.name;
 const gSearch = q => 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q);
-const gDir = (dest, mode='walking') => 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(dest) + '&travelmode=' + mode;
+const gDir = (dest, mode='walking', pid) => 'https://www.google.com/maps/dir/?api=1&destination=' + encodeURIComponent(dest) + (pid ? '&destination_place_id=' + encodeURIComponent(pid) : '') + '&travelmode=' + mode;
 const gNear = (g, ll) => 'https://www.google.com/maps/search/' + encodeURIComponent(g) + '/@' + ll[0] + ',' + ll[1] + ',17z';
 
 function tripDate(n){ if(!settings.start) return null; const d=new Date(settings.start+'T00:00:00'); d.setDate(d.getDate()+n-1); return d; }
@@ -685,7 +710,7 @@ DAYS.forEach((d,i)=>{ d.n=i+1; d.stops.forEach((s,j)=>s.id='d'+d.n+'s'+j); });
 
 /* ============ EDITABLE PLAN (แผนหลัก + แผนรอง) ============ */
 const AREA_ZONE = {nrt_ap:'nrt', narita:'nrt', kamakura:'kmk', hase:'kmk', enoshima:'kmk'};
-const zoneOf = p => AREA_ZONE[p.area] || 'tyo';
+const zoneOf = p => p.area && AREA_ZONE[p.area] ? AREA_ZONE[p.area] : (p.ll[0] < 35.45 ? 'kmk' : p.ll[1] > 140.1 ? 'nrt' : 'tyo');
 const ALT_SEED = { // แผนรองตั้งต้นที่แนะนำไว้ (สลับเข้าแผนหลักได้)
   1:['明治神宮','渋谷パルコ','MEGAドン・キホーテ渋谷本店','渋谷横丁'],
   2:['銭洗弁財天','報国寺','江の島シーキャンドル','鎌倉紅谷 八幡宮前本店'],
@@ -693,11 +718,14 @@ const ALT_SEED = { // แผนรองตั้งต้นที่แนะ�
   4:['東京国立博物館','ヤマシロヤ 上野','成田山公園','イオンモール成田'],
   5:['成田空港 第1ターミナル 展望デッキ','成田空港 第2ターミナル 展望デッキ']
 };
-function poiStop(p,t,id){ return {id:id||('c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)), t:t||'', z:zoneOf(p), n:p.name, ll:p.ll, q:p.ja, note:p.note, poi:p.id, cat:p.cat}; }
-let custom = load('jt.plan', {});
-function plan(n){ return custom[n] || { stops:DAYS[n-1].stops,
-  alts:(ALT_SEED[n]||[]).map(j=>P.find(p=>p.ja===j)).filter(Boolean).map(p=>poiStop(p,'','a'+n+p.id)) }; }
-function editPlan(n){ if(!custom[n]) custom[n]=JSON.parse(JSON.stringify(plan(n))); return custom[n]; }
+function poiStop(p,t,id){ return {id:id||('c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)), t:t||'', z:zoneOf(p), n:p.name, ll:p.ll, q:p.ja, note:p.note, poi:p.id, cat:p.cat, gid:p.gid||''}; }
+const isMain = s => /^d\d+s\d+$/.test(s.id);   // แผนหลัก (ล็อก แก้ไม่ได้)
+function defaultAlts(n){ return (ALT_SEED[n]||[]).map(j=>P.find(p=>p.ja===j)).filter(Boolean).map(p=>poiStop(p,'','a'+n+p.id)); }
+let custom = (function(c){ Object.keys(c).forEach(n=>{ const v=c[n]; if(v && v.stops && !v.added) c[n]={added:v.stops.filter(s=>!/^d\d+s\d+$/.test(s.id)), alts:v.alts||[]}; }); return c; })(load('jt.plan', {}));
+function plan(n){ const c=custom[n]; const added=c?c.added:[];
+  const stops=DAYS[n-1].stops.concat(added); sortStops(stops);
+  return {stops, alts:c?c.alts:defaultAlts(n), added}; }
+function editPlan(n){ if(!custom[n]) custom[n]={added:[], alts:JSON.parse(JSON.stringify(defaultAlts(n)))}; return custom[n]; }
 function savePlan(){ save('jt.plan',custom); }
 const hhmm = d => String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
 function addMin(t,m){ const [h,mi]=t.split(':').map(Number); const x=Math.min(23*60+59, Math.max(0,h*60+mi+m)); return String(Math.floor(x/60)).padStart(2,'0')+':'+String(x%60).padStart(2,'0'); }
@@ -715,21 +743,34 @@ function suggestTime(n, ll){
   return st.length ? addMin(st[st.length-1].t,30) : '10:00';
 }
 const inPlan = (pid)=>{ const p=plan(S.day); return p.stops.some(s=>s.poi===pid) ? 'main' : p.alts.some(s=>s.poi===pid) ? 'alt' : ''; };
+const LIVE = {}; // สถานที่จาก Google (เรียลไทม์)
+const findPoi = pid => P.find(x=>x.id===pid) || LIVE[pid];
 function addToPlan(pid, mode){
-  const p=P.find(x=>x.id===pid); if(!p) return; const ep=editPlan(S.day);
+  const p=findPoi(pid); if(!p) return; const ep=editPlan(S.day);
   if(mode==='alt'){ if(ep.alts.some(s=>s.poi===pid)){ toast('อยู่ในแผนรองแล้ว'); return; } ep.alts.push(poiStop(p,'')); toast('เพิ่ม "'+p.name+'" ในแผนรอง'); }
-  else { const t=suggestTime(S.day,p.ll); ep.alts=ep.alts.filter(s=>s.poi!==pid); ep.stops.push(poiStop(p,t)); sortStops(ep.stops); toast('ใส่ "'+p.name+'" ในแผนเวลา '+t+' (แก้เวลาได้ที่แท็บแผนวัน)'); }
+  else { const t=suggestTime(S.day,p.ll); ep.alts=ep.alts.filter(s=>s.poi!==pid); ep.added.push(poiStop(p,t)); toast('ใส่ "'+p.name+'" ในแผนเวลา '+t+' (แก้ได้ที่แท็บแผนวัน)'); }
   savePlan(); S.fitted=true; renderTab();
 }
 function promote(id){ const ep=editPlan(S.day); const i=ep.alts.findIndex(s=>s.id===id); if(i<0) return; const s=ep.alts.splice(i,1)[0];
-  s.t=suggestTime(S.day,s.ll); ep.stops.push(s); sortStops(ep.stops); savePlan(); toast('ย้าย "'+s.n+'" เข้าแผนเวลา '+s.t); renderTab(); }
-function demote(id){ const ep=editPlan(S.day); const i=ep.stops.findIndex(s=>s.id===id); if(i<0) return; const s=ep.stops.splice(i,1)[0];
+  s.t=suggestTime(S.day,s.ll); ep.added.push(s); savePlan(); toast('ย้าย "'+s.n+'" เข้าแผนเวลา '+s.t); renderTab(); }
+function demote(id){ const ep=editPlan(S.day); const i=ep.added.findIndex(s=>s.id===id); if(i<0){ toast('รายการแผนหลักถูกล็อกไว้'); return; } const s=ep.added.splice(i,1)[0];
   ep.alts.unshift(s); if(S.anchor===id) S.anchor='gps'; savePlan(); toast('ย้าย "'+s.n+'" ไปแผนรอง'); renderTab(); }
-function removeItem(id){ const ep=editPlan(S.day); ep.stops=ep.stops.filter(s=>s.id!==id); ep.alts=ep.alts.filter(s=>s.id!==id); if(S.anchor===id) S.anchor='gps'; savePlan(); renderTab(); }
-function setTime(id,t){ if(!/^\d{2}:\d{2}$/.test(t)) return; const ep=editPlan(S.day); const s=ep.stops.find(x=>x.id===id); if(!s) return; s.t=t; sortStops(ep.stops); savePlan(); renderTab(); }
+function removeItem(id){ const ep=editPlan(S.day); ep.added=ep.added.filter(s=>s.id!==id); ep.alts=ep.alts.filter(s=>s.id!==id); if(S.anchor===id) S.anchor='gps'; savePlan(); renderTab(); }
+function setTime(id,t){ if(!/^\d{2}:\d{2}$/.test(t)) return; const ep=editPlan(S.day); const s=ep.added.find(x=>x.id===id); if(!s) return; s.t=t; savePlan(); renderTab(); }
+function editField(id,f,v){ const ep=editPlan(S.day); const s=ep.added.find(x=>x.id===id) || ep.alts.find(x=>x.id===id); if(!s) return;
+  v=String(v).trim(); if(f==='n' && !v) return; s[f]=v; if(f==='n'){ s.q = s.custom ? '' : s.q; } savePlan(); }
+function addCustom(mode){
+  const n=$('#cu-n').value.trim(); if(!n){ toast('ใส่ชื่อรายการก่อน'); $('#cu-n').focus(); return; }
+  const where=$('#cu-ll').value; let ll;
+  if(where==='gps'){ if(!S.pos){ toast('ยังไม่มีตำแหน่ง GPS เลือกจุดใกล้เคียงแทน'); return; } ll=[+S.pos.lat.toFixed(6), +S.pos.lng.toFixed(6)]; }
+  else { const st=plan(S.day).stops.find(s=>s.id===where); ll = st ? st.ll : DAYS[S.day-1].stops[0].ll; }
+  const s={id:'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), t:mode==='alt'?'':$('#cu-t').value, z:zoneOf({ll}), n, ll, q:'', note:$('#cu-note').value.trim(), cat:$('#cu-cat').value, custom:1};
+  const ep=editPlan(S.day); (mode==='alt'?ep.alts:ep.added).push(s); savePlan();
+  toast(mode==='alt' ? 'เพิ่ม "'+n+'" ในแผนรอง' : 'เพิ่ม "'+n+'" เวลา '+s.t); renderTab();
+}
 function resetPlan(){ delete custom[S.day]; savePlan(); S.resetAsk=false; S.anchor = S.pos?'gps':DAYS[S.day-1].stops[0].id; S.fitted=false; toast('คืนค่าแผนเดิมของวันที่ '+S.day+' แล้ว'); renderTab(); }
 
-const curDay = ()=>{ const p=plan(S.day); return Object.assign({}, DAYS[S.day-1], {stops:p.stops, alts:p.alts, edited:!!custom[S.day]}); };
+const curDay = ()=>{ const p=plan(S.day); return Object.assign({}, DAYS[S.day-1], {stops:p.stops, alts:p.alts, added:p.added, edited:!!custom[S.day]}); };
 function toast(t){ document.querySelectorAll('.toast').forEach(x=>x.remove()); const el=document.createElement('div'); el.className='toast'; el.textContent=t; document.body.appendChild(el); setTimeout(()=>el.remove(),2400); }
 
 /* ============ HEADER ============ */
@@ -754,6 +795,11 @@ function renderStatus(){
   else if(n){ sd.className='dot warn'; st.textContent='รอซิงก์ '+n; }
   else { sd.className='dot on'; st.textContent='Sheet ซิงก์แล้ว'; }
 }
+function setTheme(t){ settings.theme=t; save('jt.settings',settings); applyTheme(t);
+  if(gm){ gClear(gmObjs); gClear(gmMe); gm=null; gmInfo=null; $('#gmap').innerHTML=''; S.fitted=false; }
+  if(S.tab==='map') renderMap(); if(S.tab==='set') renderSet(); }
+$('#themeBtn').addEventListener('click',()=>setTheme(settings.theme==='dark'?'light':'dark'));
+applyTheme(settings.theme);
 $('#gpsPill').addEventListener('click',()=>{ S.watchId===null ? startGPS() : stopGPS(); });
 $('#syncPill').addEventListener('click',()=>{ if(!settings.url){ go('set'); } else sync(true); });
 
@@ -808,7 +854,7 @@ const TILE_SRC = [
   {u:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', a:'Tiles © Esri', max:19},
   {u:'https://tile.openstreetmap.org/{z}/{x}/{y}.png', a:'© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>', max:19}
 ];
-let tileIdx = settings.map==='osm' ? 1 : 0, tileTried=new Set(), tileErr=0, tileOk=0;
+let tileIdx = settings.mapSrc==='osm' ? 1 : 0, tileTried=new Set(), tileErr=0, tileOk=0;
 function setTiles(){ if(!map) return; if(tiles) map.removeLayer(tiles);
   const src=TILE_SRC[tileIdx]; tileTried.add(tileIdx); tileErr=0; tileOk=0;
   tiles = L.tileLayer(src.u,{maxZoom:20, maxNativeZoom:src.max, attribution:src.a, crossOrigin:false});
@@ -826,13 +872,21 @@ function planBtns(pid){ const st=inPlan(pid);
     (st==='alt' ? `<span class="tag">อยู่ในแผนรอง</span>` : `<button class="btn sm add" type="button" onclick="addToPlan('${pid}','alt')">+ แผนรอง</button>`); }
 function stopPopup(s,i){ const q = s.q || (s.ll[0]+','+s.ll[1]);
   return `<div class="pop"><span class="label">${s.t} · จุดที่ ${i+1}</span><h4>${esc(s.n)}</h4>${s.note?`<p>${esc(s.note)}</p>`:''}
-  <div class="links"><a class="btn sm pri" target="_blank" rel="noopener" href="${gDir(q, s.mv?'transit':'walking')}">นำทาง</a>${s.mv?'':`<button class="btn sm" type="button" onclick="nearStop('${s.id}')">ดูรอบๆ</button><button class="btn sm" type="button" onclick="demote('${s.id}')">ย้ายไปแผนรอง</button>`}</div></div>`; }
+  <div class="links"><a class="btn sm pri" target="_blank" rel="noopener" href="${gDir(q, s.mv?'transit':'walking', s.gid)}">นำทาง</a>${s.mv?'':`<button class="btn sm" type="button" onclick="nearStop('${s.id}')">ดูรอบๆ</button>${isMain(s)?'':`<button class="btn sm" type="button" onclick="demote('${s.id}')">ย้ายไปแผนรอง</button>`}`}</div></div>`; }
 function altPopup(s){ const q = s.q || (s.ll[0]+','+s.ll[1]);
   return `<div class="pop"><span class="label">แผนรอง</span><h4>${esc(s.n)}</h4>${s.note?`<p>${esc(s.note)}</p>`:''}
-  <div class="links"><button class="btn sm pri" type="button" onclick="promote('${s.id}')">ใส่ในแผน</button><a class="btn sm" target="_blank" rel="noopener" href="${gDir(q)}">นำทาง</a></div></div>`; }
+  <div class="links"><button class="btn sm pri" type="button" onclick="promote('${s.id}')">ใส่ในแผน</button><a class="btn sm" target="_blank" rel="noopener" href="${gDir(q,'walking',s.gid)}">นำทาง</a></div></div>`; }
 
+function renderMapChips(d){
+  $('#mapCats').innerHTML = CAT_KEYS.map(k=>`<button class="chip" type="button" data-mc="${k}" aria-pressed="${S.mapCats.has(k)}"><i class="bg-${k}">${CAT[k].glyph}</i>${CAT[k].label}</button>`).join('');
+  const zs=[...new Set(d.stops.map(s=>s.z))];
+  $('#mapZones').innerHTML = zs.map(z=>`<button class="chip" type="button" data-zone="${z}">${ZONES[z]}</button>`).join('');
+}
 function renderMap(){
-  if(!map) initMap(); if(!map) return;
+  renderMapChips(curDay());
+  if(useG()){ $('#map').hidden=true; $('#gmap').hidden=false; gRender(); return; }
+  $('#gmap').hidden=true; $('#map').hidden=false;
+  if(!map) initMap(); if(!map) return; map.invalidateSize();
   const d=curDay(), act=activeIdx(d);
   lyStops.clearLayers(); lyPOI.clearLayers();
   // route lines per zone
@@ -846,20 +900,19 @@ function renderMap(){
       .bindPopup(()=>poiPopup(p)).addTo(lyPOI); });
   d.alts.forEach(s=>{ L.marker(s.ll,{zIndexOffset:900, icon:L.divIcon({className:'',html:'<div class="pin-alt">รอง</div>',iconSize:[34,20],iconAnchor:[17,10],popupAnchor:[0,-8]})})
     .bindPopup(()=>altPopup(s)).addTo(lyStops); });
-  $('#mapCats').innerHTML = CAT_KEYS.map(k=>`<button class="chip" type="button" data-mc="${k}" aria-pressed="${S.mapCats.has(k)}"><i class="bg-${k}">${CAT[k].glyph}</i>${CAT[k].label}</button>`).join('');
-  const zs=[...new Set(d.stops.map(s=>s.z))];
-  $('#mapZones').innerHTML = zs.map(z=>`<button class="chip" type="button" data-zone="${z}">${ZONES[z]}</button>`).join('');
   if(!S.fitted){ S.fitted=true; const z = act>=0 ? d.stops[act].z : d.zone; fitZone(z); }
   drawMe();
 }
 function fitZone(z){ const d=curDay(); const pts=d.stops.filter(s=>s.z===z).map(s=>s.ll);
+  if(useG()){ gFit(pts); return; } if(!map) return;
   if(pts.length===1) map.setView(pts[0],15); else if(pts.length) map.fitBounds(pts,{padding:[50,50], maxZoom:16}); }
 $('#mapCats').addEventListener('click',e=>{ const b=e.target.closest('[data-mc]'); if(!b) return; const k=b.dataset.mc;
   S.mapCats.has(k) ? S.mapCats.delete(k) : S.mapCats.add(k); renderMap(); });
 $('#mapZones').addEventListener('click',e=>{ const b=e.target.closest('[data-zone]'); if(b) fitZone(b.dataset.zone); });
 $('#locate').addEventListener('click',()=>{ if(S.watchId===null){ startGPS(); toast('กำลังหาตำแหน่ง…'); return; }
-  if(S.pos && map) map.setView([S.pos.lat,S.pos.lng],16); });
+  if(!S.pos) return; if(useG()){ if(gm){ gm.setCenter({lat:S.pos.lat,lng:S.pos.lng}); gm.setZoom(16); } } else if(map) map.setView([S.pos.lat,S.pos.lng],16); });
 function drawMe(center){
+  if(useG()){ gDrawMe(center); return; }
   if(!map) return;
   [meM,meAcc,meRad].forEach(l=>l && map.removeLayer(l)); meM=meAcc=meRad=null;
   if(!S.pos) return; const ll=[S.pos.lat,S.pos.lng];
@@ -869,6 +922,93 @@ function drawMe(center){
   if(center && S.tab==='map') map.setView(ll,16);
 }
 
+
+/* ============ GOOGLE MAPS + PLACES (ใช้เมื่อมี API Key) ============ */
+let gm=null, gmLoad=null, gmObjs=[], gmMe=[], gmInfo=null;
+const useG = ()=> !!settings.gkey && (settings.mapSrc||'auto')==='auto' && !S.gFail;
+function loadGoogle(){
+  if(gmLoad) return gmLoad.p;
+  const key=settings.gkey;
+  const p=new Promise((res,rej)=>{
+    window.__gmReady=()=>res(window.google);
+    window.gm_authFailure=()=>{ S.gFail=true; S.gErr='Google Maps API Key ใช้ไม่ได้: ตรวจว่าเปิด Maps JavaScript API และ Places API (New) แล้ว และตั้งค่าจำกัดเว็บไซต์ให้ตรงกับลิงก์ของแอป';
+      toast('Google Maps Key ใช้ไม่ได้ ใช้แผนที่ฟรีแทนชั่วคราว'); if(S.tab==='map') renderMap(); if(S.tab==='near') renderNear(); };
+    const sc=document.createElement('script'); sc.async=true;
+    sc.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(key)+'&v=weekly&libraries=marker,places&language=th&region=JP&loading=async&callback=__gmReady';
+    sc.onerror=()=>rej(new Error('load')); document.head.appendChild(sc);
+    setTimeout(()=>rej(new Error('timeout')),20000);
+  });
+  gmLoad={key,p};
+  p.catch(()=>{ S.gFail=true; S.gErr='โหลด Google Maps ไม่ได้ (ไม่มีเน็ตหรือถูกบล็อก)'; if(S.tab==='map') renderMap(); });
+  return p;
+}
+const elOf = html=>{ const t=document.createElement('div'); t.innerHTML=html; return t.firstElementChild; };
+function gClear(list){ list.forEach(o=>{ if('map' in o && typeof o.setMap!=='function') o.map=null; else o.setMap(null); }); list.length=0; }
+async function gRender(){
+  try{ await loadGoogle(); }catch(e){ return; }
+  if(!useG()) return;
+  const g=google.maps;
+  if(!gm){
+    gm=new g.Map($('#gmap'),{center:{lat:35.69,lng:139.75}, zoom:12, mapId:'DEMO_MAP_ID', disableDefaultUI:true, gestureHandling:'greedy', clickableIcons:true,
+      colorScheme: g.ColorScheme ? (settings.theme==='dark' ? g.ColorScheme.DARK : g.ColorScheme.LIGHT) : undefined});
+    gmInfo=new g.InfoWindow();
+  }
+  gClear(gmObjs);
+  const d=curDay(), act=activeIdx(d);
+  const accent=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#2c4aa0';
+  const add=(ll,html,pop,z)=>{ const m=new g.marker.AdvancedMarkerElement({map:gm, position:{lat:ll[0],lng:ll[1]}, content:elOf(html), zIndex:z||1});
+    m.addListener('click',()=>{ gmInfo.setContent(pop()); gmInfo.open({map:gm, anchor:m}); }); gmObjs.push(m); };
+  let seg=[], segZ=null;
+  const flush=()=>{ if(seg.length>1) gmObjs.push(new g.Polyline({map:gm, path:seg.map(x=>({lat:x[0],lng:x[1]})), strokeOpacity:0,
+      icons:[{icon:{path:'M 0,-1 0,1', strokeOpacity:.8, strokeColor:accent, scale:3}, offset:'0', repeat:'14px'}]})); };
+  d.stops.forEach(s=>{ if(s.z!==segZ){ flush(); seg=[]; segZ=s.z; } seg.push(s.ll); }); flush();
+  P.filter(p=>d.areas.includes(p.area) && S.mapCats.has(p.cat)).forEach(p=>add(p.ll,`<div class="pin pin-${p.cat}">${CAT[p.cat].glyph}</div>`,()=>poiPopup(p),5));
+  d.alts.forEach(s=>add(s.ll,'<div class="pin-alt">รอง</div>',()=>altPopup(s),8));
+  d.stops.forEach((s,i)=>add(s.ll,`<div class="pin-stop${i===act?' active':''}">${i+1}</div>`,()=>stopPopup(s,i),10));
+  if(!S.fitted){ S.fitted=true; fitZone(act>=0 ? d.stops[act].z : d.zone); }
+  gDrawMe();
+}
+function gFit(pts){ if(!gm || !pts.length) return;
+  if(pts.length===1){ gm.setCenter({lat:pts[0][0],lng:pts[0][1]}); gm.setZoom(15); return; }
+  const b=new google.maps.LatLngBounds(); pts.forEach(x=>b.extend({lat:x[0],lng:x[1]})); gm.fitBounds(b,50);
+  google.maps.event.addListenerOnce(gm,'idle',()=>{ if(gm.getZoom()>16) gm.setZoom(16); }); }
+function gDrawMe(center){
+  if(!gm || !window.google) return; gClear(gmMe); if(!S.pos) return;
+  const g=google.maps, c={lat:S.pos.lat,lng:S.pos.lng};
+  gmMe.push(new g.Circle({map:gm, center:c, radius:500, strokeColor:'#2f7cf6', strokeOpacity:.6, strokeWeight:1, fillOpacity:0, clickable:false}));
+  gmMe.push(new g.Circle({map:gm, center:c, radius:S.pos.acc, strokeOpacity:0, fillColor:'#2f7cf6', fillOpacity:.12, clickable:false}));
+  gmMe.push(new g.marker.AdvancedMarkerElement({map:gm, position:c, content:elOf('<div class="me"></div>'), zIndex:50}));
+  if(center && S.tab==='map'){ gm.setCenter(c); gm.setZoom(16); }
+}
+
+// ค้นสถานที่รอบตัวแบบเรียลไทม์ (Places API New) — แคช 5 นาทีเพื่อประหยัดโควตา
+const GTYPES = { f:['restaurant','cafe','bakery','bar'],
+  s:['shopping_mall','department_store','store','clothing_store','gift_shop','book_store','electronics_store','drugstore'],
+  h:['tourist_attraction','museum','park','art_gallery','amusement_park','aquarium','historical_landmark'],
+  t:['train_station','subway_station','bus_station','transit_station'],
+  o:['convenience_store','atm','pharmacy'] };
+const liveCache = {};
+async function liveSearch(ll, cat, radius){
+  const k=cat+'|'+ll[0].toFixed(4)+','+ll[1].toFixed(4)+'|'+radius;
+  const c=liveCache[k]; if(c && Date.now()-c.t < 5*60000) return c.list;
+  await loadGoogle();
+  const {Place, SearchNearbyRankPreference} = await google.maps.importLibrary('places');
+  const {places} = await Place.searchNearby({
+    fields:['id','displayName','location','rating','userRatingCount','primaryTypeDisplayName','regularOpeningHours','utcOffsetMinutes','businessStatus','googleMapsURI'],
+    locationRestriction:{center:{lat:ll[0],lng:ll[1]}, radius}, includedTypes:GTYPES[cat], maxResultCount:20,
+    rankPreference: SearchNearbyRankPreference ? SearchNearbyRankPreference.DISTANCE : 'DISTANCE', language:'th', region:'jp' });
+  const list = await Promise.all((places||[]).map(async pl=>{
+    let open=null; try{ open = await pl.isOpen(); }catch(e){}
+    const name = typeof pl.displayName==='string' ? pl.displayName : (pl.displayName && pl.displayName.text) || '';
+    const lat = typeof pl.location.lat==='function' ? pl.location.lat() : pl.location.lat, lng = typeof pl.location.lng==='function' ? pl.location.lng() : pl.location.lng;
+    const o={ id:'g_'+pl.id, gid:pl.id, cat, name, ja:name, ll:[lat,lng], url:pl.googleMapsURI||'', open, closedForGood: pl.businessStatus==='CLOSED_PERMANENTLY',
+      rating:pl.rating||0, nrating:pl.userRatingCount||0, type:pl.primaryTypeDisplayName||'' };
+    o.note=[o.rating?('★ '+o.rating.toFixed(1)+(o.nrating?' ('+o.nrating.toLocaleString('en-US')+' รีวิว)':'')):'', o.type].filter(Boolean).join(' · ');
+    LIVE[o.id]=o; return o; }));
+  const fresh=list.filter(o=>!o.closedForGood);
+  liveCache[k]={t:Date.now(), list:fresh}; return fresh;
+}
+
 /* ============ PLAN ============ */
 function renderPlan(){
   const d=curDay(), act=activeIdx(d), me = S.pos ? [S.pos.lat,S.pos.lng] : null;
@@ -876,28 +1016,42 @@ function renderPlan(){
   let next='';
   if(me){ const ni = act>=0 ? Math.min(act+ (d.stops[act] && dist(me,d.stops[act].ll)<150 ? 1:0), d.stops.length-1) : 0; const s=d.stops[ni]; const m=dist(me,s.ll);
     next = `<div class="next"><div style="flex:1;min-width:0"><div class="label">จุดถัดไป · ${s.t}</div><div style="font-weight:600">${esc(s.n)}</div><div class="sub">${m>3000?'ใช้รถไฟ':'เดิน ~'+walk(m)+' นาที'}</div></div><div class="big">${fmtD(m)}</div>
-      <a class="btn pri sm" target="_blank" rel="noopener" href="${gDir(s.q||s.ll.join(','), m>2000?'transit':'walking')}">นำทาง</a></div>`; }
+      <a class="btn pri sm" target="_blank" rel="noopener" href="${gDir(s.q||s.ll.join(','), m>2000?'transit':'walking', s.gid)}">นำทาง</a></div>`; }
   $('#planPad').innerHTML = `
     <div class="dayhead"><span class="label">วันที่ ${d.n}${dt?' · '+dt.toLocaleDateString('th-TH',{weekday:'long',day:'numeric',month:'long'}):''}</span><h2>${esc(d.title)}</h2>
       <div class="facts">${d.facts.map(f=>`<div class="fact">${esc(f[0])}<b>${esc(f[1])}</b></div>`).join('')}</div></div>
     ${next}
-    <div class="planbar"><div><h3>แผนหลัก${d.edited?' <span class="tag">ปรับแล้ว</span>':''}</h3><p class="sub" style="font-size:12px">${S.editMode?'แก้เวลาเพื่อเรียงลำดับใหม่ · ย้ายจุดไปแผนรองหรือลบได้':'เพิ่มจุดได้จากแท็บ "รอบตัว" หรือหมุดบนแผนที่'}</p></div>
+    <div class="planbar"><div><h3>แผนหลัก${d.edited?' <span class="tag">ปรับแล้ว</span>':''}</h3><p class="sub" style="font-size:12px">${S.editMode?'รายการแผนหลักถูกล็อกไว้ · รายการที่เพิ่มเองและแผนรองแก้ได้ทั้งหมด':'เพิ่มจุดได้จากแท็บ "รอบตัว" หมุดบนแผนที่ หรือกด "แก้ไขแผน"'}</p></div>
       <button class="btn sm ${S.editMode?'pri':''}" type="button" id="editToggle">${S.editMode?'เสร็จ':'แก้ไขแผน'}</button></div>
-    <ol class="timeline">${d.stops.map((s,i)=>{ const cls=['stop', s.mv?'move':'', act>=0&&i<act?'done':'', i===act?'active':'', s.poi?'added':''].join(' ');
+    <ol class="timeline">${d.stops.map((s,i)=>{ const main=isMain(s); const cls=['stop', s.mv?'move':'', act>=0&&i<act?'done':'', i===act?'active':'', main?'':'added'].join(' ');
       const dm = me ? dist(me,s.ll) : null;
-      const time = S.editMode ? `<select class="tin" data-time="${s.id}" aria-label="เวลา ${esc(s.n)}">${timeOpts(s.t)}</select>` : s.t;
-      const tools = S.editMode
-        ? `<div class="links">${s.mv?'':`<button class="btn sm" type="button" onclick="demote('${s.id}')">ย้ายไปแผนรอง</button>`}<button class="btn sm danger" type="button" onclick="removeItem('${s.id}')">ลบ</button></div>`
-        : `<div class="links"><a class="btn sm" target="_blank" rel="noopener" href="${gDir(s.q||s.ll.join(','), s.mv?'transit':'walking')}">นำทาง</a>${s.mv?'':`<button class="btn sm ghost" type="button" onclick="nearStop('${s.id}')">ดูรอบๆ 500 ม.</button>`}</div>`;
+      const editable = S.editMode && !main;
+      const time = editable ? `<select class="tin" data-time="${s.id}" aria-label="เวลา ${esc(s.n)}">${timeOpts(s.t)}</select>` : s.t;
+      const head = editable
+        ? `<input class="ein" type="text" value="${esc(s.n)}" data-edit="${s.id}" data-f="n" aria-label="ชื่อรายการ"><textarea class="ein" rows="2" data-edit="${s.id}" data-f="note" placeholder="โน้ต (ไม่บังคับ)" aria-label="โน้ต">${esc(s.note||'')}</textarea>`
+        : `<h4>${esc(s.n)}${main ? (S.editMode?' <span class="tag">แผนหลัก · ล็อก</span>':'') : ' <span class="tag">เพิ่มเอง</span>'}</h4>${s.note?`<p>${esc(s.note)}</p>`:''}`;
+      const tools = editable
+        ? `<div class="links"><button class="btn sm" type="button" onclick="demote('${s.id}')">ย้ายไปแผนรอง</button><button class="btn sm danger" type="button" onclick="removeItem('${s.id}')">ลบ</button></div>`
+        : S.editMode ? '' : `<div class="links"><a class="btn sm" target="_blank" rel="noopener" href="${gDir(s.q||s.ll.join(','), s.mv?'transit':'walking', s.gid)}">นำทาง</a>${s.mv?'':`<button class="btn sm ghost" type="button" onclick="nearStop('${s.id}')">ดูรอบๆ 500 ม.</button>`}</div>`;
       return `<li class="${cls}"><div class="t">${time}</div><div class="rail"><span></span></div><div class="body">
-        <h4>${esc(s.n)}${s.poi?' <span class="tag">เพิ่มเอง</span>':''}</h4>${s.note?`<p>${esc(s.note)}</p>`:''}${dm!==null?`<div class="meta num">ห่าง ${fmtD(dm)}</div>`:''}
+        ${head}${dm!==null && !editable?`<div class="meta num">ห่าง ${fmtD(dm)}</div>`:''}
         ${tools}</div></li>`; }).join('')}</ol>
+
+    ${S.editMode ? `<div class="card" style="display:flex;flex-direction:column;gap:10px"><h3>เพิ่มรายการเอง</h3>
+      <input id="cu-n" type="text" placeholder="ชื่อ เช่น ซื้อซิมการ์ด, ร้านที่เพื่อนแนะนำ" aria-label="ชื่อรายการ">
+      <div class="row2"><div class="field"><label for="cu-t">เวลา</label><select id="cu-t">${timeOpts(suggestTime(d.n))}</select></div>
+        <div class="field"><label for="cu-cat">หมวด</label><select id="cu-cat">${CAT_KEYS.map(k=>`<option value="${k}"${k==='o'?' selected':''}>${CAT[k].label}</option>`).join('')}</select></div></div>
+      <div class="field"><label for="cu-ll">ตำแหน่ง</label><select id="cu-ll">${S.pos?'<option value="gps">ตำแหน่งปัจจุบัน (GPS)</option>':''}${d.stops.filter(s=>!s.mv).map(s=>`<option value="${s.id}">ใกล้ ${esc(s.t+' '+s.n)}</option>`).join('')}</select></div>
+      <input id="cu-note" type="text" placeholder="โน้ต (ไม่บังคับ)" aria-label="โน้ต">
+      <div class="ctrl"><button class="btn pri" type="button" onclick="addCustom('main')">ใส่ในแผน</button><button class="btn" type="button" onclick="addCustom('alt')">เก็บในแผนรอง</button></div></div>` : ''}
 
     <div class="card alts"><div class="planbar"><h3>แผนรอง <span class="count">${d.alts.length}</span></h3>
       <button class="btn sm ghost" type="button" onclick="S.anchor=curDay().stops.find(s=>!s.mv)?.id||'gps'; go('near')">หาที่ใกล้ๆ เพิ่ม</button></div>
       ${d.alts.length ? `<ul class="plist flat">${d.alts.map(s=>{ const dm = me ? dist(me,s.ll) : null;
-        return `<li class="pitem"><div class="ic bg-${s.cat||'h'}">${CAT[s.cat||'h'].glyph}</div><div style="min-width:0"><h4>${esc(s.n)}</h4>${s.note?`<p>${esc(s.note)}</p>`:''}
-          <div class="links"><button class="btn sm pri" type="button" onclick="promote('${s.id}')">ใส่ในแผน</button><a class="btn sm" target="_blank" rel="noopener" href="${gDir(s.q||s.ll.join(','))}">นำทาง</a><button class="btn sm ghost danger" type="button" onclick="removeItem('${s.id}')">ลบ</button></div></div>
+        return `<li class="pitem"><div class="ic bg-${s.cat||'h'}">${CAT[s.cat||'h'].glyph}</div><div style="min-width:0">${S.editMode
+          ? `<input class="ein" type="text" value="${esc(s.n)}" data-edit="${s.id}" data-f="n" aria-label="ชื่อรายการ"><input class="ein" type="text" value="${esc(s.note||'')}" data-edit="${s.id}" data-f="note" placeholder="โน้ต (ไม่บังคับ)" aria-label="โน้ต">`
+          : `<h4>${esc(s.n)}</h4>${s.note?`<p>${esc(s.note)}</p>`:''}`}
+          <div class="links"><button class="btn sm pri" type="button" onclick="promote('${s.id}')">ใส่ในแผน</button><a class="btn sm" target="_blank" rel="noopener" href="${gDir(s.q||s.ll.join(','),'walking',s.gid)}">นำทาง</a><button class="btn sm ghost danger" type="button" onclick="removeItem('${s.id}')">ลบ</button></div></div>
           <div class="d">${dm!==null?`<b>${fmtD(dm)}</b>`:''}</div></li>`; }).join('')}</ul>`
         : `<p class="sub">ยังไม่มีแผนรอง กด "+ แผนรอง" ในแท็บรอบตัวหรือบนหมุดแผนที่</p>`}
     </div>
@@ -907,6 +1061,7 @@ function renderPlan(){
     <div class="card"><h3>เคล็ดลับวันนี้</h3><ul class="tips" style="margin-top:8px">${d.tips.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>`;
   $('#editToggle').onclick=()=>{ S.editMode=!S.editMode; renderPlan(); };
   $('#planPad').querySelectorAll('[data-time]').forEach(inp=>inp.onchange=()=>setTime(inp.dataset.time, inp.value));
+  $('#planPad').querySelectorAll('[data-edit]').forEach(inp=>inp.onchange=()=>{ editField(inp.dataset.edit, inp.dataset.f, inp.value); toast('บันทึกแล้ว'); });
 }
 function nearStop(id){ S.anchor=id; go('near'); }
 
@@ -934,20 +1089,40 @@ function renderNear(){
         <div class="links"><a class="btn sm pri" target="_blank" rel="noopener" href="${gDir(gq(x.p))}">นำทาง</a><a class="btn sm" target="_blank" rel="noopener" href="${gSearch(gq(x.p))}">ดูรีวิว</a></div>
         <div class="links">${planBtns(x.p.id)}</div></div>
         <div class="d"><b>${fmtD(x.m)}</b>เดิน ${walk(x.m)} น.</div></li>`;
-    body = `
+    const srcSeg = settings.gkey && !S.gFail ? `<div class="seg" role="group" aria-label="แหล่งข้อมูล" style="align-self:flex-start">
+        <button type="button" data-src="live" aria-pressed="${S.nsrc!=='pick'}">สดจาก Google</button><button type="button" data-src="pick" aria-pressed="${S.nsrc==='pick'}">ที่คัดไว้</button></div>` : '';
+    if(settings.gkey && !S.gFail && S.nsrc!=='pick'){
+      body = `${srcSeg}
+      <div class="cats" id="ncats">${CAT_KEYS.map(k=>`<button class="chip" type="button" data-nc="${k}" aria-pressed="${S.ncat===k}"><i class="bg-${k}">${CAT[k].glyph}</i>${CAT[k].label}</button>`).join('')}</div>
+      <div id="liveBox"><div class="card empty">กำลังค้นหา${CAT[S.ncat].label}ในระยะ ${S.radius} ม. จาก Google…</div></div>
+      <a class="btn" target="_blank" rel="noopener" href="${gNear(CAT[S.ncat].g, a.ll)}">เปิดค้นหาใน Google Maps</a>`;
+      const req = S.liveReq = Date.now();
+      setTimeout(()=>liveSearch(a.ll, S.ncat, S.radius).then(list=>{
+        if(S.liveReq!==req || !$('#liveBox')) return;
+        const rows=list.map(o=>({o, m:dist(a.ll,o.ll)})).sort((x,y)=>x.m-y.m);
+        $('#liveBox').innerHTML = rows.length ? `<ul class="plist">${rows.map(({o,m})=>`<li class="pitem"><div class="ic bg-${o.cat}">${CAT[o.cat].glyph}</div><div style="min-width:0">
+            <h4>${esc(o.name)}</h4><p>${esc(o.note)} ${o.open===true?'<span class="livebadge open">เปิดอยู่</span>':o.open===false?'<span class="livebadge closed">ปิดอยู่</span>':''}</p>
+            <div class="links"><a class="btn sm pri" target="_blank" rel="noopener" href="${gDir(o.name,'walking',o.gid)}">นำทาง</a>${o.url?`<a class="btn sm" target="_blank" rel="noopener" href="${esc(o.url)}">ดูรีวิว</a>`:''}</div>
+            <div class="links">${planBtns(o.id)}</div></div><div class="d"><b>${fmtD(m)}</b>เดิน ${walk(m)} น.</div></li>`).join('')}</ul>
+            <p class="sub" style="font-size:11px">ข้อมูลจาก Google · อัปเดตล่าสุด ${new Date(liveCache[Object.keys(liveCache).find(k=>liveCache[k].list===list)]?.t||Date.now()).toLocaleTimeString('th-TH',{hour:'2-digit',minute:'2-digit'})}</p>`
+          : `<div class="card empty">Google ไม่พบ${CAT[S.ncat].label}ในระยะ ${S.radius} ม. ลองเพิ่มรัศมีเป็น 500 ม.</div>`;
+      }).catch(err=>{ if(S.liveReq!==req || !$('#liveBox')) return;
+        $('#liveBox').innerHTML = `<div class="card empty">ค้นหาจาก Google ไม่สำเร็จ ${esc(S.gErr||'')}<br>ตรวจว่าเปิด <b>Places API (New)</b> ใน Google Cloud แล้ว · กด "ที่คัดไว้" เพื่อดูรายการสำรอง</div>`; }),0);
+    } else body = `${srcSeg}
       <div class="cats" id="ncats">${CAT_KEYS.map(k=>`<button class="chip" type="button" data-nc="${k}" aria-pressed="${S.ncat===k}"><i class="bg-${k}">${CAT[k].glyph}</i>${CAT[k].label} <span class="count">${counts[k]}</span></button>`).join('')}</div>
       ${list.length ? `<ul class="plist">${list.map(item).join('')}</ul>` : `<div class="card empty">ยังไม่มี${CAT[S.ncat].label}ที่คัดไว้ในระยะ ${S.radius} ม. จาก "${esc(a.name)}"</div>`}
       <a class="btn" target="_blank" rel="noopener" href="${gNear(CAT[S.ncat].g, a.ll)}">ค้นหา${CAT[S.ncat].label}เพิ่มใน Google Maps รอบจุดนี้</a>
       ${more.length ? `<div class="label">ไกลขึ้นอีกนิด (ไม่เกิน 1.2 กม.)</div><ul class="plist">${more.slice(0,8).map(item).join('')}</ul>` : ''}`;
   }
   $('#nearPad').innerHTML = `
-    <div><h2>รอบตัว</h2><p class="sub">${a?'จาก: '+esc(a.name):'เลือกจุดอ้างอิง'}</p></div>
+    <div><h2>รอบตัว</h2><p class="sub">${a?'จาก: '+esc(a.name):'เลือกจุดอ้างอิง'}${!settings.gkey?' · ใส่ Google Maps API Key ในตั้งค่าเพื่อค้นร้านแบบเรียลไทม์':''}</p></div>
     <div class="ctrl"><select id="anchorSel" aria-label="จุดอ้างอิง" style="flex:1 1 200px">${opts}</select>
       <div class="seg" role="group" aria-label="รัศมี">${[300,500].map(r=>`<button type="button" data-r="${r}" aria-pressed="${S.radius===r}">${r} ม.</button>`).join('')}</div></div>
     ${body}`;
   $('#anchorSel').onchange = e=>{ S.anchor=e.target.value; if(S.anchor==='gps' && S.watchId===null) startGPS(); renderNear(); };
   $('#nearPad').querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{ S.radius=+b.dataset.r; renderNear(); });
   const nc=$('#ncats'); if(nc) nc.onclick=e=>{ const b=e.target.closest('[data-nc]'); if(b){ S.ncat=b.dataset.nc; renderNear(); } };
+  $('#nearPad').querySelectorAll('[data-src]').forEach(b=>b.onclick=()=>{ S.nsrc=b.dataset.src; renderNear(); });
 }
 
 /* ============ EXPENSES ============ */
@@ -1041,12 +1216,14 @@ document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==
 
 /* ============ SETTINGS ============ */
 // ค่าที่ใช้ร่วมกันทุกคน (เก็บในแท็บ Settings ของ Google Sheet) — ค่าอื่นเป็นของเครื่องใครเครื่องมัน
-const GLOBAL_KEYS = ['start','rate','budget','logLoc','logMin'];
-const GCONV = {start:v=>String(v||''), rate:v=>parseFloat(v)||0.22, budget:v=>parseFloat(v)||0, logLoc:v=>String(v)==='true', logMin:v=>parseInt(v,10)||10};
+const GLOBAL_KEYS = ['start','rate','budget','logLoc','logMin','gkey'];
+const GCONV = {start:v=>String(v||''), rate:v=>parseFloat(v)||0.22, budget:v=>parseFloat(v)||0, logLoc:v=>String(v)==='true', logMin:v=>parseInt(v,10)||10, gkey:v=>String(v||'').trim()};
 function gsUrl(type){ return settings.url + (settings.url.includes('?')?'&':'?') + (type?'type='+type+'&':'') + 'key=' + encodeURIComponent(settings.key||''); }
 function applyGlobal(o){
   let ch=false;
-  GLOBAL_KEYS.forEach(k=>{ if(o[k]===undefined || o[k]==='') return; const v=GCONV[k](o[k]); if(settings[k]!==v){ settings[k]=v; ch=true; } });
+  const oldKey=settings.gkey;
+  GLOBAL_KEYS.forEach(k=>{ if(o[k]===undefined || (o[k]==='' && k!=='gkey')) return; const v=GCONV[k](o[k]); if(settings[k]!==v){ settings[k]=v; ch=true; } });
+  if(settings.gkey!==oldKey) gkeyChanged();
   if(ch){ save('jt.settings',settings); const ad=autoDay(); if(ad) S.day=ad; renderDays(); renderStatus();
     const typing = S.tab==='set' && $('#setPad').contains(document.activeElement);
     if(!typing) renderTab(); }
@@ -1072,6 +1249,9 @@ async function pushSettings(keys){
   catch(e){ S.globalErr='บันทึกการตั้งค่ากลางไม่สำเร็จ: '+(e.message||e); toast('บันทึกการตั้งค่ากลางไม่สำเร็จ'); }
   updateGlobalMsg();
 }
+function gkeyChanged(){
+  if(gmLoad){ toast('เปลี่ยน Google Maps Key แล้ว กำลังโหลดแอปใหม่'); setTimeout(()=>location.reload(),1500); return; }
+  S.gFail=false; S.gErr=''; if(S.tab==='map') renderMap(); if(S.tab==='near') renderNear(); }
 function updateGlobalMsg(){ const m=$('#g-msg'); if(!m) return;
   m.textContent = !settings.url ? 'ยังไม่เชื่อม Google Sheet ตอนนี้ค่าเหล่านี้ใช้เฉพาะเครื่องนี้'
     : S.globalErr ? S.globalErr
@@ -1093,6 +1273,8 @@ function renderSet(){
       <div class="field"><label for="s-bud">งบทั้งทริป (บาท)</label><input id="s-bud" type="number" inputmode="numeric" value="${settings.budget||''}" placeholder="เช่น 30000"></div>
       <div class="switch"><div><b style="font-size:14px">ส่งตำแหน่งลง Sheet</b><div class="hint" style="font-size:12px;color:var(--muted)">ทุกเครื่องที่เปิดแอปอยู่จะส่งตำแหน่งลงแท็บ Locations</div></div><input id="s-log" type="checkbox" ${settings.logLoc?'checked':''}></div>
       <div class="field"><label for="s-min">ส่งทุกกี่นาที</label><select id="s-min">${[5,10,15,30].map(m=>`<option ${settings.logMin==m?'selected':''} value="${m}">${m} นาที</option>`).join('')}</select></div>
+      <div class="field"><label for="s-gkey">Google Maps API Key</label><input id="s-gkey" type="password" autocomplete="off" spellcheck="false" value="${esc(settings.gkey||'')}" placeholder="AIza…">
+        <span class="hint">ใส่แล้วแผนที่จะเป็น Google Maps และแท็บรอบตัวค้นร้านแบบเรียลไทม์ได้ · Key เก็บใน Google Sheet ไม่อยู่ในไฟล์บน GitHub${S.gErr?`<br><b style="color:var(--bad)">${esc(S.gErr)}</b>`:''}</span></div>
       <p class="msg" id="g-msg"></p>
     </div>
 
@@ -1118,9 +1300,12 @@ function renderSet(){
 
     <div ${box}>
       <div class="planbar"><h3>การแสดงผลในเครื่องนี้</h3><span class="tag">เครื่องนี้</span></div>
+      <div class="field"><label>ธีม</label><div class="seg" role="group" aria-label="ธีม" style="align-self:flex-start">
+        <button type="button" data-theme-set="light" aria-pressed="${settings.theme!=='dark'}">ขาว</button><button type="button" data-theme-set="dark" aria-pressed="${settings.theme==='dark'}">ดำ</button></div></div>
       <div class="field"><label for="s-map">แบบแผนที่</label><select id="s-map">
-        <option value="esri" ${settings.map!=='osm'?'selected':''}>Esri Street Map (ชื่อภาษาอังกฤษ)</option>
-        <option value="osm" ${settings.map==='osm'?'selected':''}>OpenStreetMap (ชื่อภาษาญี่ปุ่น)</option></select>
+        <option value="auto" ${(settings.mapSrc||'auto')==='auto'?'selected':''}>Google Maps (ถ้ามี Key) / Esri</option>
+        <option value="esri" ${settings.mapSrc==='esri'?'selected':''}>Esri Street Map (ฟรี ชื่อภาษาอังกฤษ)</option>
+        <option value="osm" ${settings.mapSrc==='osm'?'selected':''}>OpenStreetMap (ฟรี ชื่อภาษาญี่ปุ่น)</option></select>
         <span class="hint">ถ้าแผนที่ไม่ขึ้น ลองสลับแบบ</span></div>
       <div class="switch"><div><b style="font-size:14px">กันหน้าจอดับ</b><div class="hint" style="font-size:12px;color:var(--muted)">เบราว์เซอร์หยุด GPS เมื่อจอดับ เปิดไว้ถ้าต้องการติดตามต่อเนื่อง (กินแบต)</div></div><input id="s-wake" type="checkbox" ${settings.wake?'checked':''}></div>
     </div>
@@ -1134,10 +1319,12 @@ function renderSet(){
     save('jt.settings',settings); const ad=autoDay(); if(ad) S.day=ad; renderDays(); renderStatus();
     pushSettings(GLOBAL_KEYS.filter(k=>before[k]!==settings[k])); };
   ['s-start','s-rate','s-bud','s-log','s-min'].forEach(id=>$('#'+id).addEventListener('change',saveGlobal));
+  $('#s-gkey').addEventListener('change',()=>{ const v=$('#s-gkey').value.trim(); if(v===settings.gkey) return; settings.gkey=v; save('jt.settings',settings); pushSettings(['gkey']); gkeyChanged(); });
   // เฉพาะเครื่อง
   const saveConn=()=>{ settings.url=$('#s-url').value.trim(); settings.key=$('#s-key').value; save('jt.settings',settings); renderStatus(); };
   ['s-url','s-key'].forEach(id=>$('#'+id).addEventListener('change',saveConn));
-  $('#s-map').onchange=e=>{ settings.map=e.target.value; save('jt.settings',settings); tileIdx = settings.map==='osm'?1:0; tileTried=new Set(); setTiles(); toast('เปลี่ยนแบบแผนที่แล้ว'); };
+  $('#s-map').onchange=e=>{ settings.mapSrc=e.target.value; save('jt.settings',settings); tileIdx = settings.mapSrc==='osm'?1:0; tileTried=new Set(); if(map) setTiles(); S.fitted=false; toast('เปลี่ยนแบบแผนที่แล้ว'); };
+  $('#setPad').querySelectorAll('[data-theme-set]').forEach(b=>b.onclick=()=>setTheme(b.dataset.themeSet));
   $('#s-wake').onchange=e=>{ settings.wake=e.target.checked; save('jt.settings',settings); keepAwake(settings.wake && S.watchId!==null); };
   $('#s-save').onclick=async()=>{ saveConn(); if(!settings.url){ toast('ใส่ URL ก่อน'); return; } toast('กำลังเชื่อมต่อ…'); S.globalLoaded=false; await pullSettings(); sync(); pull(true); renderSet(); };
   $('#s-test').onclick=async()=>{ saveConn(); const m=$('#s-msg'); if(!settings.url){ m.textContent='ใส่ URL ก่อน'; return; } m.textContent='กำลังทดสอบ…';
