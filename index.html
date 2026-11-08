@@ -2,7 +2,7 @@
 <html lang="th" data-theme="light">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -39,6 +39,7 @@
 
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
+html{touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:100%} /* ปิดดับเบิลแทปซูม */
 body{background:var(--bg);color:var(--ink);font:15px/1.5 var(--f-body);display:flex;flex-direction:column;overflow:hidden;-webkit-tap-highlight-color:transparent}
 [hidden]{display:none!important}
 button,input,select,textarea{font:inherit;color:inherit}
@@ -278,6 +279,30 @@ pre.code{margin:0;max-height:240px;overflow:auto;background:var(--sunk);border-r
 .msg{font-size:12px;color:var(--muted);min-height:1em}
 .toast{position:fixed;left:50%;bottom:calc(76px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 16px;border-radius:999px;font-size:13px;z-index:1000;max-width:calc(100% - 32px);text-align:center}
 @media (prefers-reduced-motion: no-preference){ .toast{animation:up .2s ease-out} @keyframes up{from{transform:translate(-50%,8px);opacity:0}} }
+/* มือถือ: ขนาดกระชับขึ้น เห็นเนื้อหาได้มากขึ้นต่อหน้าจอ */
+@media (max-width:520px){
+  body{font-size:14px}
+  .top{padding-block:6px 4px}
+  .days{padding-block:2px 6px}
+  .daybtn{padding:4px 10px;border-radius:9px}
+  .daybtn b{font-size:12px} .daybtn span{font-size:10.5px}
+  .pad{padding-block:10px 16px;gap:10px}
+  .card{padding:11px 12px}
+  h2{font-size:16px}
+  .dayhead{gap:4px}
+  .fact{padding:4px 8px;font-size:11.5px}
+  .stop .body{padding-bottom:10px}
+  .stop .body h4{font-size:14px;line-height:1.3}
+  .stop .body p{margin-top:2px;font-size:12px;line-height:1.4}
+  .stop .t{font-size:12px}
+  .links{margin-top:5px;gap:5px}
+  .btn{padding:6px 10px}
+  .btn.sm{padding:3px 8px;font-size:11.5px}
+  .pitem{padding:9px 10px;gap:8px}
+  .tab{padding:5px 2px 4px;font-size:10.5px}
+  .tab svg{width:20px;height:20px}
+}
+
 </style>
 </head>
 <body>
@@ -1175,6 +1200,9 @@ function renderStatus(){
 function setTheme(t){ settings.theme=t; save('jt.settings',settings); applyTheme(t);
   if(gm){ gClear(gmObjs); gClear(gmMe); gm=null; gmInfo=null; $('#gmap').innerHTML=''; S.fitted=false; }
   if(S.tab==='map') renderMap(); if(S.tab==='set') renderSet(); }
+// กันผู้ใช้ซูมหน้าแอปด้วยสองนิ้ว (iOS ไม่สนใจ user-scalable=no) · ยกเว้นบนแผนที่ซึ่งซูมแผนที่ได้ตามปกติ
+['gesturestart','gesturechange'].forEach(ev=>document.addEventListener(ev, e=>{ if(!(e.target.closest && e.target.closest('#map,#gmap'))) e.preventDefault(); }, {passive:false}));
+document.addEventListener('touchmove', e=>{ if(e.touches.length>1 && !(e.target.closest && e.target.closest('#map,#gmap'))) e.preventDefault(); }, {passive:false});
 $('#themeBtn').addEventListener('click',()=>setTheme(settings.theme==='dark'?'light':'dark'));
 $('#brandBtn').addEventListener('click',()=>{ go('trips'); $('#v-trips').scrollTop=0; });
 applyTheme(settings.theme);
