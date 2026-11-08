@@ -100,6 +100,10 @@ nav.tabs{flex:none;display:grid;grid-template-columns:repeat(5,1fr);background:v
 .map-tools>*{pointer-events:auto}
 .chip{flex:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 11px;font-size:12px;display:inline-flex;align-items:center;gap:6px;box-shadow:0 1px 3px rgba(0,0,0,.08)}
 .chip[aria-pressed="false"]{opacity:.5}
+.msr{width:13px;height:13px;fill:#fff;display:block}
+.chip i.gi{background:var(--gc)}
+.pitem .ic.gi{background:var(--gc)} .pitem .ic.gi .msr{width:17px;height:17px}
+.gmask{display:block;width:16px;height:16px;background:#fff;-webkit-mask:var(--m) center/contain no-repeat;mask:var(--m) center/contain no-repeat}
 .chip i{font-style:normal;font-family:var(--f-jp);font-size:11px;width:18px;height:18px;border-radius:50%;display:inline-grid;place-items:center;color:#fff}
 .map-zones{position:absolute;z-index:500;bottom:12px;left:max(10px,env(safe-area-inset-left,0px));display:flex;gap:6px;flex-wrap:wrap;max-width:70%}
 .route-panel{position:absolute;z-index:600;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);border-radius:14px 14px 0 0;box-shadow:0 -4px 16px rgba(0,0,0,.15);
@@ -976,7 +980,7 @@ function save(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){}
 /* ===== Google Sheet ประจำแอป =====
    วาง URL ของ Web app (ลงท้าย /exec) ไว้ตรงนี้ครั้งเดียว แล้ว push ขึ้น GitHub
    → ทุกคนที่เปิดแอปจะเชื่อมต่อ Sheet นี้อัตโนมัติ ไม่ต้องตั้งค่าเอง (หน้าตั้งค่ามีปุ่มคัดลอกบรรทัดนี้ให้) */
-const DEFAULT_SHEET_URL = '';
+const DEFAULT_SHEET_URL = 'https://script.google.com/macros/s/AKfycbyG270VP0_ck436wl0iJdY-xlDn6SQ-6ECNq6wWhQJmkv_IqNwdlPpmar-darbf5gDb/exec';
 const settings = Object.assign({url:'', key:'', start:'', rate:0.22, budget:0, gpsAuto:false, logLoc:false, logMin:10, wake:false, mapSrc:'auto', gkey:'', theme:'light'}, load('jt.settings',{}));
 if(!settings.url && DEFAULT_SHEET_URL) settings.url = DEFAULT_SHEET_URL;
 // รหัสเครื่อง (ใช้ระบุ "คนสร้างทริป" ตอนตั้งค่าซ่อนทริป) + รหัสเข้าร่วมทริปที่ซ่อน
@@ -1487,20 +1491,24 @@ const GTYPES = { f:['restaurant','cafe','bakery','bar'],
   t:['train_station','subway_station','bus_station','transit_station'],
   o:['convenience_store','atm','pharmacy'] };
 // หมวดแบบเดียวกับปุ่มหมวดในแอป Google Maps (ค่า c = สี/ไอคอนของหมุดในแอปนี้)
+// ic = ไอคอน Material (ชุดเดียวกับใน Google Maps) · col = สีหมวดของ Google Maps
 const GCATS = [
-  {k:'rest',  l:'ร้านอาหาร',        c:'f', g:'restaurants',         types:['restaurant']},
-  {k:'cafe',  l:'คาเฟ่',             c:'f', g:'cafe',                types:['cafe','coffee_shop']},
-  {k:'bar',   l:'บาร์',              c:'f', g:'bars',                types:['bar','pub']},
-  {k:'conv',  l:'ร้านสะดวกซื้อ',     c:'o', g:'convenience store',   types:['convenience_store']},
-  {k:'groc',  l:'ซูเปอร์มาร์เก็ต',   c:'s', g:'supermarket',         types:['supermarket','grocery_store']},
-  {k:'shop',  l:'ช็อปปิ้ง',          c:'s', g:'shopping',            types:['shopping_mall','department_store','clothing_store','gift_shop','electronics_store','book_store']},
-  {k:'todo',  l:'สถานที่ท่องเที่ยว', c:'h', g:'things to do',        types:['tourist_attraction','museum','historical_landmark','art_gallery','amusement_park','aquarium']},
-  {k:'park',  l:'สวนสาธารณะ',       c:'h', g:'parks',               types:['park']},
-  {k:'hotel', l:'โรงแรม',            c:'o', g:'hotels',              types:['lodging','hotel']},
-  {k:'pharm', l:'ร้านขายยา',         c:'o', g:'pharmacy',            types:['pharmacy','drugstore']},
-  {k:'atm',   l:'ATM',               c:'o', g:'atm',                 types:['atm']},
-  {k:'stat',  l:'สถานีรถไฟ',         c:'t', g:'train station',       types:['train_station','subway_station']}
+  {k:'rest',  l:'ร้านอาหาร',        c:'f', ic:'restaurant',              col:'#F57C00', g:'restaurants',       types:['restaurant']},
+  {k:'cafe',  l:'คาเฟ่',             c:'f', ic:'local_cafe',              col:'#F57C00', g:'cafe',              types:['cafe','coffee_shop']},
+  {k:'bar',   l:'บาร์',              c:'f', ic:'local_bar',               col:'#F57C00', g:'bars',              types:['bar','pub']},
+  {k:'conv',  l:'ร้านสะดวกซื้อ',     c:'o', ic:'local_convenience_store', col:'#4285F4', g:'convenience store', types:['convenience_store']},
+  {k:'groc',  l:'ซูเปอร์มาร์เก็ต',   c:'s', ic:'local_grocery_store',     col:'#4285F4', g:'supermarket',       types:['supermarket','grocery_store']},
+  {k:'shop',  l:'ช็อปปิ้ง',          c:'s', ic:'shopping_bag',            col:'#4285F4', g:'shopping',          types:['shopping_mall','department_store','clothing_store','gift_shop','electronics_store','book_store']},
+  {k:'todo',  l:'สถานที่ท่องเที่ยว', c:'h', ic:'photo_camera',            col:'#12B5CB', g:'things to do',      types:['tourist_attraction','museum','historical_landmark','art_gallery','amusement_park','aquarium']},
+  {k:'park',  l:'สวนสาธารณะ',       c:'h', ic:'park',                    col:'#34A853', g:'parks',             types:['park']},
+  {k:'hotel', l:'โรงแรม',            c:'o', ic:'hotel',                   col:'#E8618C', g:'hotels',            types:['lodging','hotel']},
+  {k:'pharm', l:'ร้านขายยา',         c:'o', ic:'local_pharmacy',          col:'#EA4335', g:'pharmacy',          types:['pharmacy','drugstore']},
+  {k:'atm',   l:'ATM',               c:'o', ic:'local_atm',               col:'#7B8794', g:'atm',               types:['atm']},
+  {k:'stat',  l:'สถานีรถไฟ',         c:'t', ic:'train',                   col:'#1A73E8', g:'train station',     types:['train_station','subway_station']}
 ];
+// ไอคอน Material Icons (Round) แบบเดียวกับ Google Maps · Apache License 2.0
+const MI = {"restaurant": "<path d=\"M16 6v6c0 1.1.9 2 2 2h1v7c0 .55.45 1 1 1s1-.45 1-1V3.13c0-.65-.61-1.13-1.24-.98C17.6 2.68 16 4.51 16 6zm-5 3H9V3c0-.55-.45-1-1-1s-1 .45-1 1v6H5V3c0-.55-.45-1-1-1s-1 .45-1 1v6c0 2.21 1.79 4 4 4v8c0 .55.45 1 1 1s1-.45 1-1v-8c2.21 0 4-1.79 4-4V3c0-.55-.45-1-1-1s-1 .45-1 1v6z\"/>", "local_cafe": "<path d=\"M20 3H6c-1.1 0-2 .9-2 2v8c0 2.21 1.79 4 4 4h6c2.21 0 4-1.79 4-4v-3h2c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 5h-2V5h2v3zM3 21h16c.55 0 1-.45 1-1s-.45-1-1-1H3c-.55 0-1 .45-1 1s.45 1 1 1z\"/>", "local_bar": "<path d=\"M21 4.45c0-.8-.65-1.45-1.45-1.45H4.45C3.65 3 3 3.65 3 4.45c0 .35.13.7.37.96L11 14v5H7c-.55 0-1 .45-1 1s.45 1 1 1h10c.55 0 1-.45 1-1s-.45-1-1-1h-4v-5l7.63-8.59c.24-.26.37-.61.37-.96zM7.43 7 5.66 5h12.69l-1.78 2H7.43z\"/>", "local_convenience_store": "<path d=\"m21.9 7.89-1.05-3.37c-.22-.9-1-1.52-1.91-1.52H5.05c-.9 0-1.69.63-1.9 1.52L2.1 7.89c-.46 1.97.85 3.11.9 3.17V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7.94c1.12-1.12 1.09-2.41.9-3.17zM13 5h1.96l.54 3.52c.09.71-.39 1.48-1.28 1.48-.67 0-1.22-.59-1.22-1.31V5zM6.44 8.86c-.08.65-.6 1.14-1.21 1.14-.93 0-1.35-.97-1.19-1.64L5.05 5h1.97l-.58 3.86zM10.5 16H9v1h1.5c.28 0 .5.22.5.5s-.22.5-.5.5h-2c-.28 0-.5-.22-.5-.5v-2c0-.28.22-.5.5-.5H10v-1H8.5c-.28 0-.5-.22-.5-.5s.22-.5.5-.5h2c.28 0 .5.22.5.5v2c0 .28-.22.5-.5.5zm.5-7.31c0 .72-.55 1.31-1.29 1.31-.75 0-1.3-.7-1.22-1.48L9.04 5H11v3.69zM15.5 18c-.28 0-.5-.22-.5-.5V16h-1.5c-.28 0-.5-.22-.5-.5v-2c0-.28.22-.5.5-.5s.5.22.5.5V15h1v-1.5c0-.28.22-.5.5-.5s.5.22.5.5v4c0 .28-.22.5-.5.5zm3.27-8c-.61 0-1.14-.49-1.21-1.14L16.98 5l1.93-.01 1.05 3.37c.16.67-.25 1.64-1.19 1.64z\"/>", "local_grocery_store": "<path d=\"M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM2 4h1l3.6 7.59-1.35 2.44C4.52 15.37 5.48 17 7 17h11c.55 0 1-.45 1-1s-.45-1-1-1H7l1.1-2h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49A.996.996 0 0 0 20.01 4H5.21l-.67-1.43a.993.993 0 0 0-.9-.57H2c-.55 0-1 .45-1 1s.45 1 1 1zm15 14c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z\"/>", "shopping_bag": "<path d=\"M18 6h-2c0-2.21-1.79-4-4-4S8 3.79 8 6H6c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-8 4c0 .55-.45 1-1 1s-1-.45-1-1V8h2v2zm2-6c1.1 0 2 .9 2 2h-4c0-1.1.9-2 2-2zm4 6c0 .55-.45 1-1 1s-1-.45-1-1V8h2v2z\"/>", "photo_camera": "<circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M20 4h-3.17l-1.24-1.35A1.99 1.99 0 0 0 14.12 2H9.88c-.56 0-1.1.24-1.48.65L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 13c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z\"/>", "park": "<path d=\"M16.96 12h.08c.81 0 1.28-.91.82-1.57l-5.08-7.25a1 1 0 0 0-1.64 0L6.1 10.43c-.46.66.02 1.57.83 1.57h.04l-2.9 4.46c-.44.66.04 1.54.84 1.54h5.08v2.02c0 1.09.89 1.98 1.98 1.98 1.09 0 1.98-.89 1.98-1.98V18h5.15c.8 0 1.28-.89.83-1.55L16.96 12z\"/>", "hotel": "<path d=\"M7 13c1.66 0 3-1.34 3-3S8.66 7 7 7s-3 1.34-3 3 1.34 3 3 3zm12-6h-6c-1.1 0-2 .9-2 2v5H3V6c0-.55-.45-1-1-1s-1 .45-1 1v13c0 .55.45 1 1 1s1-.45 1-1v-2h18v2c0 .55.45 1 1 1s1-.45 1-1v-8c0-2.21-1.79-4-4-4z\"/>", "local_pharmacy": "<path d=\"M18.89 5h-.53l.71-1.97c.24-.65-.1-1.37-.75-1.6-.65-.24-1.37.1-1.61.75L15.69 5H5.1a2 2 0 0 0-1.9 2.63L5 13l-1.79 5.37C2.77 19.66 3.74 21 5.1 21h13.78c1.36 0 2.33-1.34 1.9-2.63L19 13l1.78-5.37C21.21 6.34 20.25 5 18.89 5zM15 14h-2v2c0 .55-.45 1-1 1s-1-.45-1-1v-2H9c-.55 0-1-.45-1-1s.45-1 1-1h2v-2c0-.55.45-1 1-1s1 .45 1 1v2h2c.55 0 1 .45 1 1s-.45 1-1 1z\"/>", "local_atm": "<path d=\"M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 13c0 .55-.45 1-1 1H5c-.55 0-1-.45-1-1V7c0-.55.45-1 1-1h14c.55 0 1 .45 1 1v10zm-6-7c.55 0 1-.45 1-1s-.45-1-1-1h-1v-.01c0-.55-.45-1-1-1s-1 .45-1 1V8h-1c-.55 0-1 .45-1 1v3c0 .55.45 1 1 1h3v1h-3c-.55 0-1 .45-1 1s.45 1 1 1h1c0 .55.45 1 1 1s1-.45 1-1h1c.55 0 1-.45 1-1v-3c0-.55-.45-1-1-1h-3v-1h3z\"/>", "train": "<path d=\"M12 2c-4 0-8 .5-8 4v9.5C4 17.43 5.57 19 7.5 19l-1.15 1.15a.5.5 0 0 0 .36.85H7.8c.13 0 .26-.05.35-.15L10 19h4l1.85 1.85c.09.09.22.15.35.15h1.09c.45 0 .67-.54.35-.85L16.5 19c1.93 0 3.5-1.57 3.5-3.5V6c0-3.5-4-4-8-4zM7.5 17c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm3.5-7H6V6h5v4zm5.5 7c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-7h-5V6h5v4z\"/>"};
+const mi = n => `<svg class="msr" data-ic="${n}" viewBox="0 0 24 24" aria-hidden="true">${MI[n]||''}</svg>`;
 const gcatOf = k => GCATS.find(x=>x.k===k) || GCATS[0];
 const liveCache = {};
 async function liveSearch(ll, gc, radius){
@@ -1509,7 +1517,7 @@ async function liveSearch(ll, gc, radius){
   await loadGoogle();
   const {Place, SearchNearbyRankPreference} = await google.maps.importLibrary('places');
   const {places} = await Place.searchNearby({
-    fields:['id','displayName','location','rating','userRatingCount','primaryTypeDisplayName','regularOpeningHours','utcOffsetMinutes','businessStatus','googleMapsURI'],
+    fields:['id','displayName','location','rating','userRatingCount','primaryTypeDisplayName','regularOpeningHours','utcOffsetMinutes','businessStatus','googleMapsURI','svgIconMaskURI','iconBackgroundColor'],
     locationRestriction:{center:{lat:ll[0],lng:ll[1]}, radius}, includedTypes:gc.types, maxResultCount:20,
     rankPreference: SearchNearbyRankPreference ? SearchNearbyRankPreference.DISTANCE : 'DISTANCE', language:'th', region:T().region||'jp' });
   const list = await Promise.all((places||[]).map(async pl=>{
@@ -1518,7 +1526,7 @@ async function liveSearch(ll, gc, radius){
     const lat = typeof pl.location.lat==='function' ? pl.location.lat() : pl.location.lat, lng = typeof pl.location.lng==='function' ? pl.location.lng() : pl.location.lng;
     const type = typeof pl.primaryTypeDisplayName==='string' ? pl.primaryTypeDisplayName : (pl.primaryTypeDisplayName && pl.primaryTypeDisplayName.text) || '';
     const o={ id:'g_'+pl.id, gid:pl.id, cat:gc.c, name, ja:name, ll:[lat,lng], url:pl.googleMapsURI||'', open, closedForGood: pl.businessStatus==='CLOSED_PERMANENTLY',
-      rating:pl.rating||0, nrating:pl.userRatingCount||0, type };
+      rating:pl.rating||0, nrating:pl.userRatingCount||0, type, mask:pl.svgIconMaskURI||'', bg:pl.iconBackgroundColor||'' };
     o.note=[o.rating?('★ '+o.rating.toFixed(1)+(o.nrating?' ('+o.nrating.toLocaleString('en-US')+' รีวิว)':'')):''].filter(Boolean).join(' · ');
     LIVE[o.id]=o; return o; }));
   const fresh=list.filter(o=>!o.closedForGood);
@@ -1680,7 +1688,7 @@ function renderNear(){
     if(settings.gkey && !S.gFail && S.nsrc!=='pick'){
       const gc=gcatOf(S.gcat);
       body = `${srcSeg}
-      <div class="cats" id="gcats">${GCATS.map(x=>`<button class="chip" type="button" data-gc="${x.k}" aria-pressed="${gc.k===x.k}"><i class="bg-${x.c}">${CAT[x.c].glyph}</i>${x.l}</button>`).join('')}</div>
+      <div class="cats" id="gcats">${GCATS.map(x=>`<button class="chip" type="button" data-gc="${x.k}" aria-pressed="${gc.k===x.k}"><i class="gi" style="--gc:${x.col}">${mi(x.ic)}</i>${x.l}</button>`).join('')}</div>
       <div id="liveBox"><div class="card empty">กำลังค้นหา${gc.l}ในระยะ ${S.radius} ม. จาก Google…</div></div>
       <a class="btn" target="_blank" rel="noopener" href="${gNear(gc.g, a.ll)}">เปิดค้นหา${gc.l}ใน Google Maps</a>
       ${importBox()}`;
@@ -1688,7 +1696,10 @@ function renderNear(){
       setTimeout(()=>liveSearch(a.ll, gc, S.radius).then(list=>{
         if(S.liveReq!==req || !$('#liveBox')) return;
         const rows=list.map(o=>({o, m:dist(a.ll,o.ll)})).sort((x,y)=>x.m-y.m);
-        $('#liveBox').innerHTML = rows.length ? `<ul class="plist">${rows.map(({o,m})=>`<li class="pitem"><div class="ic bg-${o.cat}">${CAT[o.cat].glyph}</div><div style="min-width:0">
+        // ไอคอนของแต่ละร้านมาจาก Google (svgIconMaskURI + iconBackgroundColor) · ถ้าไม่มี ใช้ไอคอนของหมวด
+        const gIcon = o => /^https:\/\//.test(o.mask) ? `<div class="ic gi" style="--gc:${/^#[0-9a-f]{3,8}$/i.test(o.bg)?o.bg:gc.col}"><span class="gmask" style="--m:url('${o.mask}')"></span></div>`
+          : `<div class="ic gi" style="--gc:${gc.col}">${mi(gc.ic)}</div>`;
+        $('#liveBox').innerHTML = rows.length ? `<ul class="plist">${rows.map(({o,m})=>`<li class="pitem">${gIcon(o)}<div style="min-width:0">
             <h4>${esc(o.name)}</h4><p>${o.type?`<span class="tag">${esc(o.type)}</span> `:''}${esc(o.note)} ${o.open===true?'<span class="livebadge open">เปิดอยู่</span>':o.open===false?'<span class="livebadge closed">ปิดอยู่</span>':''}</p>
             <div class="links">${navBtn({n:o.name, ll:o.ll, q:o.name, gid:o.gid}, 'walking', 'btn sm pri')}${o.url?`<a class="btn sm" target="_blank" rel="noopener" href="${esc(o.url)}">ดูรีวิว</a>`:''}</div>
             <div class="links">${planBtns(o.id)}</div></div><div class="d"><b>${fmtD(m)}</b>เดิน ${walk(m)} น.</div></li>`).join('')}</ul>
