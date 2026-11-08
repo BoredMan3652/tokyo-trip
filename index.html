@@ -122,8 +122,15 @@ nav.tabs{flex:none;display:grid;grid-template-columns:repeat(5,1fr);background:v
 .pin{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;color:#fff;font:600 12px/1 var(--f-jp);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)}
 .pin-f{background:var(--c-food)} .pin-s{background:var(--c-shop)} .pin-h{background:var(--c-sight)} .pin-t{background:var(--c-station)} .pin-o{background:var(--c-other)}
 .bg-f{background:var(--c-food)} .bg-s{background:var(--c-shop)} .bg-h{background:var(--c-sight)} .bg-t{background:var(--c-station)} .bg-o{background:var(--c-other)}
-.pin-stop{width:28px;height:28px;border-radius:8px;display:grid;place-items:center;background:var(--ink);color:var(--bg);font:600 13px/1 var(--f-num);border:2px solid var(--bg);box-shadow:0 1px 5px rgba(0,0,0,.4)}
-.pin-stop.active{background:var(--accent);color:var(--accent-ink)}
+/* แผนหลัก = วงกลมสีหลักมีเลขลำดับ · แผนรอง = วงขาวขอบประ · สถานที่อื่น = จุดสีแบบ Google Maps (เล็กและจางกว่า) */
+.pin-stop{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;background:var(--accent);color:var(--accent-ink);font:700 12px/1 var(--f-num);border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.35)}
+.pin-stop.active{width:30px;height:30px;font-size:14px;box-shadow:0 0 0 5px color-mix(in srgb, var(--accent) 30%, transparent),0 1px 5px rgba(0,0,0,.4)}
+.gpin{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:var(--gc);border:1.5px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.3);opacity:.92}
+.gpin .msr{width:12px;height:12px}
+.map-plan{top:52px}
+.map-plan .chip .msr,.map-plan .chip svg{width:15px;height:15px;fill:currentColor}
+.map-plan .chip[aria-pressed="false"]{opacity:.8}
+.map-range{position:absolute;z-index:550;top:94px;left:max(10px,env(safe-area-inset-left,0px));right:max(10px,env(safe-area-inset-right,0px));max-width:360px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;box-shadow:0 4px 14px rgba(0,0,0,.18)}
 .me{width:18px;height:18px;border-radius:50%;background:#2f7cf6;border:3px solid #fff;box-shadow:0 0 0 6px rgba(47,124,246,.25)}
 .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--surface);color:var(--ink)}
 .leaflet-popup-content{margin:12px 14px;font:13px/1.45 var(--f-body);min-width:200px}
@@ -209,7 +216,8 @@ textarea{font:inherit}
 .imp .steps{font-size:12px;color:var(--muted)}
 .alts{display:flex;flex-direction:column;gap:10px}
 .plist.flat{border:0;border-radius:0;background:transparent;margin-inline:-14px;margin-bottom:-14px;border-top:1px solid var(--line)}
-.pin-alt{width:34px;height:20px;border-radius:10px;display:grid;place-items:center;background:var(--surface);color:var(--accent);font:600 10px/1 var(--f-body);border:2px dashed var(--accent);box-shadow:0 1px 4px rgba(0,0,0,.3)}
+.pin-alt{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:#fff;border:2px dashed var(--accent);box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.pin-alt .msr{width:12px;height:12px;fill:var(--accent)}
 .empty{padding:18px;text-align:center;color:var(--muted);font-size:13px}
 .banner{display:flex;gap:10px;align-items:center;justify-content:space-between;background:var(--sunk);border-radius:var(--r);padding:10px 12px;font-size:13px}
 
@@ -288,6 +296,8 @@ pre.code{margin:0;max-height:240px;overflow:auto;background:var(--sunk);border-r
     <div id="map"></div>
     <div id="gmap" hidden></div>
     <div class="map-tools" id="mapCats"></div>
+    <div class="map-tools map-plan" id="mapPlan"></div>
+    <div class="map-range" id="mapRange" hidden></div>
     <div class="map-zones" id="mapZones"></div>
     <div class="route-panel" id="routePanel" hidden></div>
     <button class="fab" id="locate" type="button" aria-label="ไปที่ตำแหน่งฉัน"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg></button>
@@ -1261,8 +1271,45 @@ function altPopup(s){ const q = s.q || (s.ll[0]+','+s.ll[1]);
   return `<div class="pop"><span class="label">แผนรอง</span><h4>${esc(s.n)}</h4>${s.note?`<p>${esc(s.note)}</p>`:''}
   <div class="links"><button class="btn sm pri" type="button" onclick="promote('${s.id}')">ใส่ในแผน</button>${navBtn(s, 'walking', 'btn sm')}</div></div>`; }
 
+// ไอคอน/สีบนแผนที่แบบเดียวกับ Google Maps
+const MAP_PAD = {paddingTopLeft:[30,140], paddingBottomRight:[30,70], maxZoom:16}; // เว้นที่ให้แถบปุ่มด้านบน/ล่างของแผนที่
+const CAT_GI = {f:['restaurant','#F57C00'], s:['shopping_bag','#4285F4'], h:['photo_camera','#12B5CB'], t:['train','#1A73E8'], o:['info','#7B8794']};
+const catGi = c => CAT_GI[c] || CAT_GI.h;
+const poiPin  = p => `<div class="gpin" style="--gc:${catGi(p.cat)[1]}">${mi(catGi(p.cat)[0])}</div>`;
+const altPin  = s => `<div class="pin-alt" title="แผนรอง">${mi(catGi(s.cat)[0])}</div>`;
+const stopPin = (i,act) => `<div class="pin-stop${act?' active':''}">${i+1}</div>`;
+// เส้นทางตามแผน (เปิด/ปิด จำค่าในเครื่อง) + แสดงเฉพาะช่วงจุดที่เลือก
+let mapRoute = load('jt.mapRoute', true);
+function planRange(d){ const r=S.rng; return r && r.day===S.day && r.trip===curTrip && r.b<d.stops.length ? r : null; }
+const inRange = (r,i) => !r || (i>=r.a && i<=r.b);
+const inPlanIds = d => new Set(d.stops.map(s=>s.poi).concat(d.alts.map(s=>s.poi)).filter(Boolean));
+function renderMapPlan(d){
+  const r=planRange(d);
+  $('#mapPlan').innerHTML = `<button class="chip" type="button" id="mpRoute" aria-pressed="${mapRoute}">${mi('route')}เส้นทาง${mapRoute?'':' (ปิด)'}</button>
+    <button class="chip" type="button" id="mpRange" aria-pressed="${!!r}">${mi('tune')}${r?`จุดที่ ${r.a+1}–${r.b+1}`:'ทุกจุด'}</button>`;
+  $('#mpRoute').onclick=()=>{ mapRoute=!mapRoute; save('jt.mapRoute',mapRoute); renderMap(); };
+  $('#mpRange').onclick=()=>{ const el=$('#mapRange'); el.hidden=!el.hidden; if(!el.hidden) renderRangePanel(d); };
+}
+function renderRangePanel(d){
+  const r=planRange(d)||{a:0, b:Math.max(0,d.stops.length-1)}, el=$('#mapRange');
+  if(!d.stops.length){ el.innerHTML='<p class="msg">วันนี้ยังไม่มีจุดในแผน</p>'; return; }
+  const opts=sel=>d.stops.map((s,i)=>`<option value="${i}"${i===sel?' selected':''}>${i+1} · ${esc(s.t)} ${esc(s.n)}</option>`).join('');
+  el.innerHTML=`<div class="field"><label for="rgA">ตั้งแต่จุดที่</label><select id="rgA">${opts(r.a)}</select></div>
+    <div class="field"><label for="rgB">ถึงจุดที่</label><select id="rgB">${opts(r.b)}</select></div>
+    <div class="ctrl"><button class="btn sm pri" type="button" id="rgOk">แสดงช่วงนี้</button><button class="btn sm" type="button" id="rgAll">แสดงทุกจุด</button></div>`;
+  $('#rgOk').onclick=()=>{ let a=+$('#rgA').value, b=+$('#rgB').value; if(a>b) [a,b]=[b,a];
+    S.rng={day:S.day, trip:curTrip, a, b}; el.hidden=true; renderMap(); fitRange(); };
+  $('#rgAll').onclick=()=>{ S.rng=null; el.hidden=true; S.fitted=false; renderMap(); };
+}
+function fitRange(){ const d=curDay(), r=planRange(d); const pts=d.stops.filter((s,i)=>inRange(r,i)).map(s=>s.ll); if(!pts.length) return;
+  if(useG()) gFit(pts); else if(map){ if(pts.length===1) map.setView(pts[0],16); else map.fitBounds(pts,MAP_PAD); } }
+function routeSegs(d){ // เส้นเชื่อมจุดในแผน แยกตามโซน เฉพาะช่วงที่เลือก
+  if(!mapRoute) return []; const r=planRange(d), out=[]; let seg=[], z=null;
+  d.stops.forEach((s,i)=>{ if(!inRange(r,i)) return; if(s.z!==z){ if(seg.length>1) out.push(seg); seg=[]; z=s.z; } seg.push(s.ll); });
+  if(seg.length>1) out.push(seg); return out; }
 function renderMapChips(d){
-  $('#mapCats').innerHTML = CAT_KEYS.map(k=>`<button class="chip" type="button" data-mc="${k}" aria-pressed="${S.mapCats.has(k)}"><i class="bg-${k}">${CAT[k].glyph}</i>${CAT[k].label}</button>`).join('');
+  $('#mapCats').innerHTML = CAT_KEYS.map(k=>`<button class="chip" type="button" data-mc="${k}" aria-pressed="${S.mapCats.has(k)}"><i class="gi" style="--gc:${catGi(k)[1]}">${mi(catGi(k)[0])}</i>${CAT[k].label}</button>`).join('');
+  renderMapPlan(d);
   const zs=[...new Set(d.stops.map(s=>s.z))].filter(z=>isTokyo() && ZONES[z]);
   $('#mapZones').innerHTML = zs.map(z=>`<button class="chip" type="button" data-zone="${z}">${ZONES[z]}</button>`).join('');
 }
@@ -1274,18 +1321,16 @@ function renderMap(){
   if(!map) initMap(); if(!map) return; map.invalidateSize();
   const d=curDay(), act=activeIdx(d);
   lyStops.clearLayers(); lyPOI.clearLayers();
-  // route lines per zone
-  let seg=[], segZ=null;
-  const flush=()=>{ if(seg.length>1) L.polyline(seg,{color:getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#2c4aa0',weight:3,dashArray:'6 7',opacity:.75}).addTo(lyStops); };
-  d.stops.forEach(s=>{ if(s.z!==segZ){ flush(); seg=[]; segZ=s.z; } seg.push(s.ll); }); flush();
-  d.stops.forEach((s,i)=>{ L.marker(s.ll,{zIndexOffset:1000, icon:L.divIcon({className:'',html:`<div class="pin-stop${i===act?' active':''}">${i+1}</div>`,iconSize:[28,28],iconAnchor:[14,14],popupAnchor:[0,-12]})})
+  const rg=planRange(d), used=inPlanIds(d), accent=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#2c4aa0';
+  routeSegs(d).forEach(seg=>L.polyline(seg,{color:accent,weight:3,dashArray:'6 7',opacity:.75}).addTo(lyStops));
+  d.stops.forEach((s,i)=>{ if(!inRange(rg,i)) return; const a=i===act; L.marker(s.ll,{zIndexOffset:1000, icon:L.divIcon({className:'',html:stopPin(i,a),iconSize:a?[30,30]:[24,24],iconAnchor:a?[15,15]:[12,12],popupAnchor:[0,-12]})})
     .bindPopup(()=>stopPopup(s,i)).addTo(lyStops); });
-  tripPlaces().filter(p=>d.areas.includes(p.area) && S.mapCats.has(p.cat)).forEach(p=>{
-    L.marker(p.ll,{icon:L.divIcon({className:'',html:`<div class="pin pin-${p.cat}">${CAT[p.cat].glyph}</div>`,iconSize:[24,24],iconAnchor:[12,12],popupAnchor:[0,-10]})})
+  tripPlaces().filter(p=>d.areas.includes(p.area) && S.mapCats.has(p.cat) && !used.has(p.id)).forEach(p=>{
+    L.marker(p.ll,{icon:L.divIcon({className:'',html:poiPin(p),iconSize:[20,20],iconAnchor:[10,10],popupAnchor:[0,-10]})})
       .bindPopup(()=>poiPopup(p)).addTo(lyPOI); });
-  d.alts.forEach(s=>{ L.marker(s.ll,{zIndexOffset:900, icon:L.divIcon({className:'',html:'<div class="pin-alt">รอง</div>',iconSize:[34,20],iconAnchor:[17,10],popupAnchor:[0,-8]})})
+  d.alts.forEach(s=>{ L.marker(s.ll,{zIndexOffset:900, icon:L.divIcon({className:'',html:altPin(s),iconSize:[22,22],iconAnchor:[11,11],popupAnchor:[0,-10]})})
     .bindPopup(()=>altPopup(s)).addTo(lyStops); });
-  if(!S.fitted && !S.route){ S.fitted=true; const z = act>=0 ? d.stops[act].z : d.zone; fitZone(z); }
+  if(!S.fitted && !S.route){ S.fitted=true; if(planRange(d)) fitRange(); else fitZone(act>=0 ? d.stops[act].z : d.zone); }
   drawMe(); if(S.route) drawRoute(false);
 }
 function fitZone(z){ const d=curDay(); let pts=d.stops.filter(s=>s.z===z).map(s=>s.ll);
@@ -1293,7 +1338,7 @@ function fitZone(z){ const d=curDay(); let pts=d.stops.filter(s=>s.z===z).map(s=
   if(!pts.length){ const c = S.pos ? [S.pos.lat,S.pos.lng] : tripCenter(); // วันที่ยังไม่มีแผน: ไปที่ตำแหน่งฉัน หรือจุดกลางของทริป
     if(useG()){ if(gm){ gm.setCenter({lat:c[0],lng:c[1]}); gm.setZoom(S.pos?15:12); } } else if(map) map.setView(c, S.pos?15:12); return; }
   if(useG()){ gFit(pts); return; } if(!map) return;
-  if(pts.length===1) map.setView(pts[0],15); else map.fitBounds(pts,{padding:[50,50], maxZoom:16}); }
+  if(pts.length===1) map.setView(pts[0],15); else map.fitBounds(pts,MAP_PAD); }
 $('#mapCats').addEventListener('click',e=>{ const b=e.target.closest('[data-mc]'); if(!b) return; const k=b.dataset.mc;
   S.mapCats.has(k) ? S.mapCats.delete(k) : S.mapCats.add(k); renderMap(); });
 $('#mapZones').addEventListener('click',e=>{ const b=e.target.closest('[data-zone]'); if(b) fitZone(b.dataset.zone); });
@@ -1450,14 +1495,13 @@ async function gRender(){
   const accent=getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()||'#2c4aa0';
   const add=(ll,html,pop,z)=>{ const m=new g.marker.AdvancedMarkerElement({map:gm, position:{lat:ll[0],lng:ll[1]}, content:elOf(html), zIndex:z||1});
     m.addListener('click',()=>{ gmInfo.setContent(pop()); gmInfo.open({map:gm, anchor:m}); }); gmObjs.push(m); };
-  let seg=[], segZ=null;
-  const flush=()=>{ if(seg.length>1) gmObjs.push(new g.Polyline({map:gm, path:seg.map(x=>({lat:x[0],lng:x[1]})), strokeOpacity:0,
-      icons:[{icon:{path:'M 0,-1 0,1', strokeOpacity:.8, strokeColor:accent, scale:3}, offset:'0', repeat:'14px'}]})); };
-  d.stops.forEach(s=>{ if(s.z!==segZ){ flush(); seg=[]; segZ=s.z; } seg.push(s.ll); }); flush();
-  tripPlaces().filter(p=>d.areas.includes(p.area) && S.mapCats.has(p.cat)).forEach(p=>add(p.ll,`<div class="pin pin-${p.cat}">${CAT[p.cat].glyph}</div>`,()=>poiPopup(p),5));
-  d.alts.forEach(s=>add(s.ll,'<div class="pin-alt">รอง</div>',()=>altPopup(s),8));
-  d.stops.forEach((s,i)=>add(s.ll,`<div class="pin-stop${i===act?' active':''}">${i+1}</div>`,()=>stopPopup(s,i),10));
-  if(!S.fitted){ S.fitted=true; fitZone(act>=0 ? d.stops[act].z : d.zone); }
+  const rg=planRange(d), used=inPlanIds(d);
+  routeSegs(d).forEach(seg=>gmObjs.push(new g.Polyline({map:gm, path:seg.map(x=>({lat:x[0],lng:x[1]})), strokeOpacity:0,
+      icons:[{icon:{path:'M 0,-1 0,1', strokeOpacity:.8, strokeColor:accent, scale:3}, offset:'0', repeat:'14px'}]})));
+  tripPlaces().filter(p=>d.areas.includes(p.area) && S.mapCats.has(p.cat) && !used.has(p.id)).forEach(p=>add(p.ll,poiPin(p),()=>poiPopup(p),5));
+  d.alts.forEach(s=>add(s.ll,altPin(s),()=>altPopup(s),8));
+  d.stops.forEach((s,i)=>{ if(inRange(rg,i)) add(s.ll,stopPin(i,i===act),()=>stopPopup(s,i),i===act?12:10); });
+  if(!S.fitted){ S.fitted=true; if(planRange(d)) fitRange(); else fitZone(act>=0 ? d.stops[act].z : d.zone); }
   gDrawMe();
 }
 async function openGPlace(pid, latLng){
@@ -1473,7 +1517,7 @@ async function openGPlace(pid, latLng){
 }
 function gFit(pts){ if(!gm || !pts.length) return;
   if(pts.length===1){ gm.setCenter({lat:pts[0][0],lng:pts[0][1]}); gm.setZoom(15); return; }
-  const b=new google.maps.LatLngBounds(); pts.forEach(x=>b.extend({lat:x[0],lng:x[1]})); gm.fitBounds(b,50);
+  const b=new google.maps.LatLngBounds(); pts.forEach(x=>b.extend({lat:x[0],lng:x[1]})); gm.fitBounds(b,{top:140,bottom:70,left:30,right:30});
   google.maps.event.addListenerOnce(gm,'idle',()=>{ if(gm.getZoom()>16) gm.setZoom(16); }); }
 function gDrawMe(center){
   if(!gm || !window.google) return; gClear(gmMe); if(!S.pos) return;
@@ -1507,7 +1551,7 @@ const GCATS = [
   {k:'stat',  l:'สถานีรถไฟ',         c:'t', ic:'train',                   col:'#1A73E8', g:'train station',     types:['train_station','subway_station']}
 ];
 // ไอคอน Material Icons (Round) แบบเดียวกับ Google Maps · Apache License 2.0
-const MI = {"restaurant": "<path d=\"M16 6v6c0 1.1.9 2 2 2h1v7c0 .55.45 1 1 1s1-.45 1-1V3.13c0-.65-.61-1.13-1.24-.98C17.6 2.68 16 4.51 16 6zm-5 3H9V3c0-.55-.45-1-1-1s-1 .45-1 1v6H5V3c0-.55-.45-1-1-1s-1 .45-1 1v6c0 2.21 1.79 4 4 4v8c0 .55.45 1 1 1s1-.45 1-1v-8c2.21 0 4-1.79 4-4V3c0-.55-.45-1-1-1s-1 .45-1 1v6z\"/>", "local_cafe": "<path d=\"M20 3H6c-1.1 0-2 .9-2 2v8c0 2.21 1.79 4 4 4h6c2.21 0 4-1.79 4-4v-3h2c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 5h-2V5h2v3zM3 21h16c.55 0 1-.45 1-1s-.45-1-1-1H3c-.55 0-1 .45-1 1s.45 1 1 1z\"/>", "local_bar": "<path d=\"M21 4.45c0-.8-.65-1.45-1.45-1.45H4.45C3.65 3 3 3.65 3 4.45c0 .35.13.7.37.96L11 14v5H7c-.55 0-1 .45-1 1s.45 1 1 1h10c.55 0 1-.45 1-1s-.45-1-1-1h-4v-5l7.63-8.59c.24-.26.37-.61.37-.96zM7.43 7 5.66 5h12.69l-1.78 2H7.43z\"/>", "local_convenience_store": "<path d=\"m21.9 7.89-1.05-3.37c-.22-.9-1-1.52-1.91-1.52H5.05c-.9 0-1.69.63-1.9 1.52L2.1 7.89c-.46 1.97.85 3.11.9 3.17V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7.94c1.12-1.12 1.09-2.41.9-3.17zM13 5h1.96l.54 3.52c.09.71-.39 1.48-1.28 1.48-.67 0-1.22-.59-1.22-1.31V5zM6.44 8.86c-.08.65-.6 1.14-1.21 1.14-.93 0-1.35-.97-1.19-1.64L5.05 5h1.97l-.58 3.86zM10.5 16H9v1h1.5c.28 0 .5.22.5.5s-.22.5-.5.5h-2c-.28 0-.5-.22-.5-.5v-2c0-.28.22-.5.5-.5H10v-1H8.5c-.28 0-.5-.22-.5-.5s.22-.5.5-.5h2c.28 0 .5.22.5.5v2c0 .28-.22.5-.5.5zm.5-7.31c0 .72-.55 1.31-1.29 1.31-.75 0-1.3-.7-1.22-1.48L9.04 5H11v3.69zM15.5 18c-.28 0-.5-.22-.5-.5V16h-1.5c-.28 0-.5-.22-.5-.5v-2c0-.28.22-.5.5-.5s.5.22.5.5V15h1v-1.5c0-.28.22-.5.5-.5s.5.22.5.5v4c0 .28-.22.5-.5.5zm3.27-8c-.61 0-1.14-.49-1.21-1.14L16.98 5l1.93-.01 1.05 3.37c.16.67-.25 1.64-1.19 1.64z\"/>", "local_grocery_store": "<path d=\"M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM2 4h1l3.6 7.59-1.35 2.44C4.52 15.37 5.48 17 7 17h11c.55 0 1-.45 1-1s-.45-1-1-1H7l1.1-2h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49A.996.996 0 0 0 20.01 4H5.21l-.67-1.43a.993.993 0 0 0-.9-.57H2c-.55 0-1 .45-1 1s.45 1 1 1zm15 14c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z\"/>", "shopping_bag": "<path d=\"M18 6h-2c0-2.21-1.79-4-4-4S8 3.79 8 6H6c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-8 4c0 .55-.45 1-1 1s-1-.45-1-1V8h2v2zm2-6c1.1 0 2 .9 2 2h-4c0-1.1.9-2 2-2zm4 6c0 .55-.45 1-1 1s-1-.45-1-1V8h2v2z\"/>", "photo_camera": "<circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M20 4h-3.17l-1.24-1.35A1.99 1.99 0 0 0 14.12 2H9.88c-.56 0-1.1.24-1.48.65L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 13c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z\"/>", "park": "<path d=\"M16.96 12h.08c.81 0 1.28-.91.82-1.57l-5.08-7.25a1 1 0 0 0-1.64 0L6.1 10.43c-.46.66.02 1.57.83 1.57h.04l-2.9 4.46c-.44.66.04 1.54.84 1.54h5.08v2.02c0 1.09.89 1.98 1.98 1.98 1.09 0 1.98-.89 1.98-1.98V18h5.15c.8 0 1.28-.89.83-1.55L16.96 12z\"/>", "hotel": "<path d=\"M7 13c1.66 0 3-1.34 3-3S8.66 7 7 7s-3 1.34-3 3 1.34 3 3 3zm12-6h-6c-1.1 0-2 .9-2 2v5H3V6c0-.55-.45-1-1-1s-1 .45-1 1v13c0 .55.45 1 1 1s1-.45 1-1v-2h18v2c0 .55.45 1 1 1s1-.45 1-1v-8c0-2.21-1.79-4-4-4z\"/>", "local_pharmacy": "<path d=\"M18.89 5h-.53l.71-1.97c.24-.65-.1-1.37-.75-1.6-.65-.24-1.37.1-1.61.75L15.69 5H5.1a2 2 0 0 0-1.9 2.63L5 13l-1.79 5.37C2.77 19.66 3.74 21 5.1 21h13.78c1.36 0 2.33-1.34 1.9-2.63L19 13l1.78-5.37C21.21 6.34 20.25 5 18.89 5zM15 14h-2v2c0 .55-.45 1-1 1s-1-.45-1-1v-2H9c-.55 0-1-.45-1-1s.45-1 1-1h2v-2c0-.55.45-1 1-1s1 .45 1 1v2h2c.55 0 1 .45 1 1s-.45 1-1 1z\"/>", "local_atm": "<path d=\"M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 13c0 .55-.45 1-1 1H5c-.55 0-1-.45-1-1V7c0-.55.45-1 1-1h14c.55 0 1 .45 1 1v10zm-6-7c.55 0 1-.45 1-1s-.45-1-1-1h-1v-.01c0-.55-.45-1-1-1s-1 .45-1 1V8h-1c-.55 0-1 .45-1 1v3c0 .55.45 1 1 1h3v1h-3c-.55 0-1 .45-1 1s.45 1 1 1h1c0 .55.45 1 1 1s1-.45 1-1h1c.55 0 1-.45 1-1v-3c0-.55-.45-1-1-1h-3v-1h3z\"/>", "train": "<path d=\"M12 2c-4 0-8 .5-8 4v9.5C4 17.43 5.57 19 7.5 19l-1.15 1.15a.5.5 0 0 0 .36.85H7.8c.13 0 .26-.05.35-.15L10 19h4l1.85 1.85c.09.09.22.15.35.15h1.09c.45 0 .67-.54.35-.85L16.5 19c1.93 0 3.5-1.57 3.5-3.5V6c0-3.5-4-4-8-4zM7.5 17c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm3.5-7H6V6h5v4zm5.5 7c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-7h-5V6h5v4z\"/>"};
+const MI = {"restaurant": "<path d=\"M16 6v6c0 1.1.9 2 2 2h1v7c0 .55.45 1 1 1s1-.45 1-1V3.13c0-.65-.61-1.13-1.24-.98C17.6 2.68 16 4.51 16 6zm-5 3H9V3c0-.55-.45-1-1-1s-1 .45-1 1v6H5V3c0-.55-.45-1-1-1s-1 .45-1 1v6c0 2.21 1.79 4 4 4v8c0 .55.45 1 1 1s1-.45 1-1v-8c2.21 0 4-1.79 4-4V3c0-.55-.45-1-1-1s-1 .45-1 1v6z\"/>", "local_cafe": "<path d=\"M20 3H6c-1.1 0-2 .9-2 2v8c0 2.21 1.79 4 4 4h6c2.21 0 4-1.79 4-4v-3h2c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 5h-2V5h2v3zM3 21h16c.55 0 1-.45 1-1s-.45-1-1-1H3c-.55 0-1 .45-1 1s.45 1 1 1z\"/>", "local_bar": "<path d=\"M21 4.45c0-.8-.65-1.45-1.45-1.45H4.45C3.65 3 3 3.65 3 4.45c0 .35.13.7.37.96L11 14v5H7c-.55 0-1 .45-1 1s.45 1 1 1h10c.55 0 1-.45 1-1s-.45-1-1-1h-4v-5l7.63-8.59c.24-.26.37-.61.37-.96zM7.43 7 5.66 5h12.69l-1.78 2H7.43z\"/>", "local_convenience_store": "<path d=\"m21.9 7.89-1.05-3.37c-.22-.9-1-1.52-1.91-1.52H5.05c-.9 0-1.69.63-1.9 1.52L2.1 7.89c-.46 1.97.85 3.11.9 3.17V19c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2v-7.94c1.12-1.12 1.09-2.41.9-3.17zM13 5h1.96l.54 3.52c.09.71-.39 1.48-1.28 1.48-.67 0-1.22-.59-1.22-1.31V5zM6.44 8.86c-.08.65-.6 1.14-1.21 1.14-.93 0-1.35-.97-1.19-1.64L5.05 5h1.97l-.58 3.86zM10.5 16H9v1h1.5c.28 0 .5.22.5.5s-.22.5-.5.5h-2c-.28 0-.5-.22-.5-.5v-2c0-.28.22-.5.5-.5H10v-1H8.5c-.28 0-.5-.22-.5-.5s.22-.5.5-.5h2c.28 0 .5.22.5.5v2c0 .28-.22.5-.5.5zm.5-7.31c0 .72-.55 1.31-1.29 1.31-.75 0-1.3-.7-1.22-1.48L9.04 5H11v3.69zM15.5 18c-.28 0-.5-.22-.5-.5V16h-1.5c-.28 0-.5-.22-.5-.5v-2c0-.28.22-.5.5-.5s.5.22.5.5V15h1v-1.5c0-.28.22-.5.5-.5s.5.22.5.5v4c0 .28-.22.5-.5.5zm3.27-8c-.61 0-1.14-.49-1.21-1.14L16.98 5l1.93-.01 1.05 3.37c.16.67-.25 1.64-1.19 1.64z\"/>", "local_grocery_store": "<path d=\"M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM2 4h1l3.6 7.59-1.35 2.44C4.52 15.37 5.48 17 7 17h11c.55 0 1-.45 1-1s-.45-1-1-1H7l1.1-2h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49A.996.996 0 0 0 20.01 4H5.21l-.67-1.43a.993.993 0 0 0-.9-.57H2c-.55 0-1 .45-1 1s.45 1 1 1zm15 14c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z\"/>", "shopping_bag": "<path d=\"M18 6h-2c0-2.21-1.79-4-4-4S8 3.79 8 6H6c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm-8 4c0 .55-.45 1-1 1s-1-.45-1-1V8h2v2zm2-6c1.1 0 2 .9 2 2h-4c0-1.1.9-2 2-2zm4 6c0 .55-.45 1-1 1s-1-.45-1-1V8h2v2z\"/>", "photo_camera": "<circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M20 4h-3.17l-1.24-1.35A1.99 1.99 0 0 0 14.12 2H9.88c-.56 0-1.1.24-1.48.65L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 13c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z\"/>", "park": "<path d=\"M16.96 12h.08c.81 0 1.28-.91.82-1.57l-5.08-7.25a1 1 0 0 0-1.64 0L6.1 10.43c-.46.66.02 1.57.83 1.57h.04l-2.9 4.46c-.44.66.04 1.54.84 1.54h5.08v2.02c0 1.09.89 1.98 1.98 1.98 1.09 0 1.98-.89 1.98-1.98V18h5.15c.8 0 1.28-.89.83-1.55L16.96 12z\"/>", "hotel": "<path d=\"M7 13c1.66 0 3-1.34 3-3S8.66 7 7 7s-3 1.34-3 3 1.34 3 3 3zm12-6h-6c-1.1 0-2 .9-2 2v5H3V6c0-.55-.45-1-1-1s-1 .45-1 1v13c0 .55.45 1 1 1s1-.45 1-1v-2h18v2c0 .55.45 1 1 1s1-.45 1-1v-8c0-2.21-1.79-4-4-4z\"/>", "local_pharmacy": "<path d=\"M18.89 5h-.53l.71-1.97c.24-.65-.1-1.37-.75-1.6-.65-.24-1.37.1-1.61.75L15.69 5H5.1a2 2 0 0 0-1.9 2.63L5 13l-1.79 5.37C2.77 19.66 3.74 21 5.1 21h13.78c1.36 0 2.33-1.34 1.9-2.63L19 13l1.78-5.37C21.21 6.34 20.25 5 18.89 5zM15 14h-2v2c0 .55-.45 1-1 1s-1-.45-1-1v-2H9c-.55 0-1-.45-1-1s.45-1 1-1h2v-2c0-.55.45-1 1-1s1 .45 1 1v2h2c.55 0 1 .45 1 1s-.45 1-1 1z\"/>", "local_atm": "<path d=\"M20 4H4c-1.11 0-1.99.89-1.99 2L2 18c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V6c0-1.11-.89-2-2-2zm0 13c0 .55-.45 1-1 1H5c-.55 0-1-.45-1-1V7c0-.55.45-1 1-1h14c.55 0 1 .45 1 1v10zm-6-7c.55 0 1-.45 1-1s-.45-1-1-1h-1v-.01c0-.55-.45-1-1-1s-1 .45-1 1V8h-1c-.55 0-1 .45-1 1v3c0 .55.45 1 1 1h3v1h-3c-.55 0-1 .45-1 1s.45 1 1 1h1c0 .55.45 1 1 1s1-.45 1-1h1c.55 0 1-.45 1-1v-3c0-.55-.45-1-1-1h-3v-1h3z\"/>", "train": "<path d=\"M12 2c-4 0-8 .5-8 4v9.5C4 17.43 5.57 19 7.5 19l-1.15 1.15a.5.5 0 0 0 .36.85H7.8c.13 0 .26-.05.35-.15L10 19h4l1.85 1.85c.09.09.22.15.35.15h1.09c.45 0 .67-.54.35-.85L16.5 19c1.93 0 3.5-1.57 3.5-3.5V6c0-3.5-4-4-8-4zM7.5 17c-.83 0-1.5-.67-1.5-1.5S6.67 14 7.5 14s1.5.67 1.5 1.5S8.33 17 7.5 17zm3.5-7H6V6h5v4zm5.5 7c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm1.5-7h-5V6h5v4z\"/>", "info": "<path d=\"M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 15c-.55 0-1-.45-1-1v-4c0-.55.45-1 1-1s1 .45 1 1v4c0 .55-.45 1-1 1zm1-8h-2V7h2v2z\"/>", "route": "<path d=\"M19 15.18V7c0-2.21-1.79-4-4-4s-4 1.79-4 4v10c0 1.1-.9 2-2 2s-2-.9-2-2V8.82C8.16 8.4 9 7.3 9 6c0-1.66-1.34-3-3-3S3 4.34 3 6c0 1.3.84 2.4 2 2.82V17c0 2.21 1.79 4 4 4s4-1.79 4-4V7c0-1.1.9-2 2-2s2 .9 2 2v8.18A2.996 2.996 0 0 0 18 21c1.66 0 3-1.34 3-3 0-1.3-.84-2.4-2-2.82z\"/>", "tune": "<path d=\"M3 18c0 .55.45 1 1 1h5v-2H4c-.55 0-1 .45-1 1zM3 6c0 .55.45 1 1 1h9V5H4c-.55 0-1 .45-1 1zm10 14v-1h7c.55 0 1-.45 1-1s-.45-1-1-1h-7v-1c0-.55-.45-1-1-1s-1 .45-1 1v4c0 .55.45 1 1 1s1-.45 1-1zM7 10v1H4c-.55 0-1 .45-1 1s.45 1 1 1h3v1c0 .55.45 1 1 1s1-.45 1-1v-4c0-.55-.45-1-1-1s-1 .45-1 1zm14 2c0-.55-.45-1-1-1h-9v2h9c.55 0 1-.45 1-1zm-5-3c.55 0 1-.45 1-1V7h3c.55 0 1-.45 1-1s-.45-1-1-1h-3V4c0-.55-.45-1-1-1s-1 .45-1 1v4c0 .55.45 1 1 1z\"/>"};
 const mi = n => `<svg class="msr" data-ic="${n}" viewBox="0 0 24 24" aria-hidden="true">${MI[n]||''}</svg>`;
 const gcatOf = k => GCATS.find(x=>x.k===k) || GCATS[0];
 const liveCache = {};
